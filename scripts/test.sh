@@ -13,7 +13,7 @@ fail() {
 }
 
 echo "== contract files =="
-for f in README.md SPEC.md BUILD.md CONTRIBUTING.md scripts/test.sh; do
+for f in README.md SPEC.md BUILD.md CONTRIBUTING.md scripts/test.sh llms.txt; do
   [[ -f "$f" ]] || fail "missing $f"
   [[ -s "$f" ]] || fail "empty $f"
 done
@@ -34,7 +34,7 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 fi
 
 echo "== markdown is UTF-8 text =="
-file -b --mime-encoding README.md SPEC.md CONTRIBUTING.md BUILD.md | grep -qiE 'utf-8|us-ascii' \
+file -b --mime-encoding README.md SPEC.md CONTRIBUTING.md BUILD.md llms.txt | grep -qiE 'utf-8|us-ascii' \
   || fail "docs are not UTF-8/ASCII"
 
 echo "== G2 fixtures (PR 2) =="
@@ -104,8 +104,32 @@ echo "== compare + search + categories (PR 4) =="
 if grep -R --include='*.ts' --exclude='fastify.d.ts' -l 'adapters/' src/http >/dev/null 2>&1; then
   fail "src/http imported adapters (routes must call core/* only)"
 fi
-if [[ -d src/mcp ]]; then
-  fail "MCP is PR 5; do not land it here"
+
+echo "== MCP tools (PR 5) =="
+[[ -f src/mcp/server.ts ]] || fail "missing src/mcp/server.ts"
+[[ -f src/mcp/tools.ts ]] || fail "missing src/mcp/tools.ts"
+[[ -f tests/mcp.test.ts ]] || fail "missing tests/mcp.test.ts"
+[[ -f llms.txt ]] || fail "missing llms.txt"
+grep -q 'get_saas' src/mcp/tools.ts || fail "src/mcp/tools.ts missing get_saas"
+grep -q 'list_reviews' src/mcp/tools.ts || fail "src/mcp/tools.ts missing list_reviews"
+grep -q 'compare_saas' src/mcp/tools.ts || fail "src/mcp/tools.ts missing compare_saas"
+grep -q 'get_saas' llms.txt || fail "llms.txt missing get_saas"
+grep -q 'list_reviews' llms.txt || fail "llms.txt missing list_reviews"
+grep -q 'compare_saas' llms.txt || fail "llms.txt missing compare_saas"
+grep -q 'When not to call' llms.txt || fail "llms.txt missing when-not-to-call"
+grep -qi 'not complete vs G2' llms.txt || fail "llms.txt missing sold-dataset disclaimer"
+grep -qi 'affiliation' llms.txt || fail "llms.txt missing affiliation disclaimer"
+if grep -RIn --include='*.ts' -E "from ['\"].*adapters/" src/mcp | grep -v 'import type' >/dev/null; then
+  fail "src/mcp imported adapters (tools must call core/* only)"
+fi
+grep -q 'getProductByUrl' src/mcp/tools.ts || fail "get_saas must call core/product"
+grep -q 'getProductReviews' src/mcp/tools.ts || fail "list_reviews must call core/reviews"
+grep -q 'compareProducts' src/mcp/tools.ts || fail "compare_saas must call core/compare"
+if grep -RInE --include='*.ts' '(^|[^[:alnum:]_])(fetch|axios|got)\s*\(' src/mcp >/dev/null; then
+  fail "live HTTP client call in src/mcp (fixture adapter only)"
+fi
+if grep -R --include='*.ts' -E 'https?://(www\.)?(g2|capterra)\.com' src/mcp >/dev/null; then
+  fail "src/mcp must not hardcode live G2/Capterra hosts"
 fi
 
 if [[ -f package.json ]]; then
