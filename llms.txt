@@ -1,0 +1,82 @@
+# SaaSReviews
+
+> G2 and Capterra public reviews as one JSON schema. Same-day key.
+
+Independent index of public reviews. Not a G2 partnership. Not complete vs G2’s sold dataset. Do not imply affiliation with G2 or Capterra.
+
+Skill: public reviews only; never invent a star rating (missing overall is `null`, not `0`); unmatched compare returns both cards + `warning: "unmatched"`.
+
+SEO: `G2 API access 2026`, `Capterra data without a partnership`.
+
+## URLs
+
+- REST: https://api.saasreviews.dev
+- MCP Streamable HTTP: https://mcp.saasreviews.dev/mcp
+- This file: /llms.txt
+- Server card: /.well-known/mcp/server-card.json
+
+## Auth
+
+```
+Authorization: Bearer sr_live_...
+Authorization: Bearer sr_test_...
+```
+
+Same key space for REST and MCP. No scopes. `sr_test_*` uses recorded fixtures and never hits live G2 or Capterra.
+
+## MCP tools
+
+### get_saas
+
+Maps to `GET /v1/products/by-url`. **1 credit** on success, including cache hits.
+
+Arguments: `url` and/or `id` (one required). Accepts G2 `/products/{slug}` and Capterra `/p/{id}/{slug}` or `/p/{slug}` URLs, or `sr_prod_{directory}_{slug}`.
+
+`data` is the frozen product card (ProductRef, sameAs, scores.overall number or null, scores.max always stated, reviewCount, pricingTeaser, categories, extractedAt). Never invent stars. Dual ids when G2 and Capterra cannot be matched: `sameAs` stays empty until compare links them.
+
+### list_reviews
+
+Maps to `GET /v1/products/{id}/reviews`. **1 credit per page**, including empty pages and cache hits.
+
+Arguments: `id` (required), optional `page` (1-based, default 1).
+
+Empty page is `{ reviews: [], hasMore: false }`, never 404. Only public text. No login wall bypass. Never invent a review.
+
+### compare_saas
+
+Maps to `GET /v1/compare`. **2 credits** when both lookups succeed (including unmatched).
+
+Arguments: `a` and `b` (required) — product ids, `directory:slug`, or G2/Capterra URLs.
+
+Returns two product cards + `scoreDelta` only if both `overall` are numbers. Unmatched names: both cards + `warning: "unmatched"`, no fake merge. Do not invent a delta from `null`.
+
+## When not to call
+
+- TrustRadius, Gartner, or any directory that is not G2 or Capterra — expect `directory_unsupported`, 0 credits.
+- You need G2’s sold / partner dataset or completeness vs G2 — we index public reviews only.
+- You need login-walled review text — we do not bypass login walls.
+- You want to imply affiliation (“official G2 API”, “G2 alternative dataset”) — do not. Independent public index.
+- You want hosted badge images — we do not host badges.
+- You want us to invent a missing star rating as 0 — missing overall is `null`.
+
+## Errors
+
+Same envelope as REST. `creditsCharged` is always 0 on error. Tool failures set `isError: true` and keep the REST error body in `structuredContent`.
+
+| code | HTTP | retryable |
+|---|---|---|
+| invalid_request | 400 | no |
+| unauthorized | 401 | no |
+| payment_required | 402 | no |
+| product_not_found | 404 | no |
+| directory_unsupported | 422 | no |
+| unmatched_compare | 200 | no |
+| rate_limited | 429 | yes |
+| upstream_blocked | 503 | yes |
+| internal | 500 | yes |
+
+Failed directory bot wall is `upstream_blocked` and costs **0 credits**. Never invent product scores or review rows.
+
+## Credits
+
+Free: 100 once. Monthly $19 / 2,000. Product 1. Reviews 1 / page. Compare 2. Failures cost 0.

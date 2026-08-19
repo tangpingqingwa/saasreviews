@@ -9,6 +9,7 @@ import { meRoutes } from "./http/routes/me.js";
 import { productRoutes } from "./http/routes/products.js";
 import { searchRoutes } from "./http/routes/search.js";
 import { usageRoutes } from "./http/routes/usage.js";
+import { mcpRoutes } from "./mcp/server.js";
 
 export type BuildAppOptions = {
   logger?: boolean;
@@ -42,5 +43,6 @@ export async function buildApp(
   await app.register(compareRoutes);
   await app.register(searchRoutes);
   await app.register(categoryRoutes);
+  await app.register(mcpRoutes);
   return app;
 }
