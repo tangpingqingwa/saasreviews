@@ -2,9 +2,12 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { createAppAdapters, type AdapterLookup } from "./adapters/index.js";
 import { bootstrapKeyIfEmpty } from "./billing/keys.js";
 import { openDatabase, type SaasReviewsDb } from "./db.js";
+import { categoryRoutes } from "./http/routes/categories.js";
+import { compareRoutes } from "./http/routes/compare.js";
 import { healthRoutes } from "./http/routes/health.js";
 import { meRoutes } from "./http/routes/me.js";
 import { productRoutes } from "./http/routes/products.js";
+import { searchRoutes } from "./http/routes/search.js";
 import { usageRoutes } from "./http/routes/usage.js";
 
 export type BuildAppOptions = {
@@ -36,5 +39,8 @@ export async function buildApp(
   await app.register(meRoutes);
   await app.register(usageRoutes);
   await app.register(productRoutes);
+  await app.register(compareRoutes);
+  await app.register(searchRoutes);
+  await app.register(categoryRoutes);
   return app;
 }

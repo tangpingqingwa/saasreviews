@@ -55,6 +55,9 @@ export function createJsonFixtureAdapter(
       }
       return { ok: true, page: structuredClone(page) };
     },
+    listProducts(): ProductCard[] {
+      return [...products.values()].map((card) => structuredClone(card));
+    },
   };
 }
 

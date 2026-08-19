@@ -3,6 +3,9 @@ import type { SaasReviewsDb } from "../db.js";
 
 export const PRODUCT_CREDIT_COST = 1;
 export const REVIEW_PAGE_CREDIT_COST = 1;
+export const COMPARE_CREDIT_COST = 2;
+export const SEARCH_PAGE_CREDIT_COST = 1;
+export const CATEGORY_PAGE_CREDIT_COST = 1;
 
 export type ChargeInput = {
   keyId: string;

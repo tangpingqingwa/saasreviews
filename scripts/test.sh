@@ -93,8 +93,16 @@ if [[ -d src/adapters ]] || [[ -d src/core ]]; then
     fail "live HTTP client call in adapters/core (fixture adapter only)"
   fi
 fi
-if [[ -f src/core/compare.ts ]] || [[ -f src/core/search.ts ]] || [[ -f src/core/categories.ts ]]; then
-  fail "compare/search/categories are PR 4; do not land them here"
+
+echo "== compare + search + categories (PR 4) =="
+[[ -f src/core/compare.ts ]] || fail "missing src/core/compare.ts"
+[[ -f src/core/search.ts ]] || fail "missing src/core/search.ts"
+[[ -f src/core/categories.ts ]] || fail "missing src/core/categories.ts"
+[[ -f tests/compare.test.ts ]] || fail "missing tests/compare.test.ts"
+[[ -f tests/search.test.ts ]] || fail "missing tests/search.test.ts"
+[[ -f tests/categories.test.ts ]] || fail "missing tests/categories.test.ts"
+if grep -R --include='*.ts' --exclude='fastify.d.ts' -l 'adapters/' src/http >/dev/null 2>&1; then
+  fail "src/http imported adapters (routes must call core/* only)"
 fi
 if [[ -d src/mcp ]]; then
   fail "MCP is PR 5; do not land it here"
