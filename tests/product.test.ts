@@ -3,8 +3,13 @@ import { readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { createCapterraFixtureAdapter } from "../src/adapters/capterra/fixture.js";
 import { createG2FixtureAdapter } from "../src/adapters/g2/fixture.js";
-import type { DirectoryAdapter } from "../src/adapters/types.js";
+import {
+  createAppAdapters,
+  registryOf,
+  type AdapterLookup,
+} from "../src/adapters/index.js";
 import { buildApp } from "../src/app.js";
 import { getCredits } from "../src/billing/credits.js";
 import { createKey } from "../src/billing/keys.js";
@@ -19,6 +24,7 @@ import {
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const KEY = "sr_test_g2_product";
 const G2_PRODUCTS = join(ROOT, "tests/fixtures/g2/products");
+const CAPTERRA_PRODUCTS = join(ROOT, "tests/fixtures/capterra/products");
 
 type OkBody = {
   data: ProductCard;
@@ -35,12 +41,12 @@ type ErrBody = {
   meta: { creditsCharged: number; requestId: string };
 };
 
-async function appWithKey(credits = 100, adapter?: DirectoryAdapter) {
+async function appWithKey(credits = 100, adapters?: AdapterLookup) {
   const db = openDatabase(":memory:");
   createKey(db, { secret: KEY, credits });
   const app = await buildApp({
     db,
-    adapter: adapter ?? createG2FixtureAdapter(),
+    adapters: adapters ?? createAppAdapters(),
   });
   after(async () => {
     await app.close();
@@ -57,12 +63,19 @@ test("G2 fixture catalog has 10 product cards with max 5", () => {
   const files = readdirSync(G2_PRODUCTS).filter((name) => name.endsWith(".json"));
   assert.equal(files.length, 10);
   const slugs = new Set<string>();
+  const adapter = createG2FixtureAdapter();
+  assert.equal(adapter.directory, "g2");
   for (const file of files) {
-    const adapter = createG2FixtureAdapter();
     slugs.add(file.replace(/\.json$/, ""));
-    assert.equal(adapter.directory, "g2");
   }
   assert.equal(slugs.size, 10);
+});
+
+test("Capterra fixture catalog has 10 product cards with max 5", () => {
+  const files = readdirSync(CAPTERRA_PRODUCTS).filter((name) => name.endsWith(".json"));
+  assert.equal(files.length, 10);
+  const adapter = createCapterraFixtureAdapter();
+  assert.equal(adapter.directory, "capterra");
 });
 
 test("parseProductUrl accepts G2 product and /reviews paths", () => {
@@ -82,12 +95,24 @@ test("parseProductUrl accepts G2 product and /reviews paths", () => {
   }
 });
 
-test("parseProductUrl rejects Capterra and unknown directories before fetch", () => {
-  const capterra = parseProductUrl("https://www.capterra.com/p/notion");
-  assert.equal(capterra.ok, false);
-  if (!capterra.ok) {
-    assert.equal(capterra.code, "directory_unsupported");
+test("parseProductUrl accepts Capterra /p/{id}/{slug} and /p/{slug}", () => {
+  const cases: Array<{ url: string; slug: string }> = [
+    { url: "https://www.capterra.com/p/notion/", slug: "notion" },
+    { url: "https://capterra.com/p/184621/Notion", slug: "notion" },
+    { url: "www.capterra.com/p/184621/notion/reviews", slug: "notion" },
+    { url: "https://www.capterra.com/p/obsidian", slug: "obsidian" },
+  ];
+  for (const { url, slug } of cases) {
+    const parsed = parseProductUrl(url);
+    assert.equal(parsed.ok, true, url);
+    if (parsed.ok) {
+      assert.equal(parsed.directory, "capterra");
+      assert.equal(parsed.directorySlug, slug);
+    }
   }
+});
+
+test("parseProductUrl rejects unknown directories before fetch", () => {
   const gartner = parseProductUrl("https://www.gartner.com/reviews/market/foo");
   assert.equal(gartner.ok, false);
   if (!gartner.ok) {
@@ -122,20 +147,70 @@ test("GET /v1/products/by-url returns Notion name and numeric overall (SPEC 1)",
   assert.deepEqual(body.data.sameAs, []);
 });
 
-test("missing overall stays null, never 0 (SPEC 6)", async () => {
+test("Capterra product URL returns the same card schema with max 5 (SPEC 2)", async () => {
   const { app } = await appWithKey();
   const response = await app.inject({
     method: "GET",
-    url: "/v1/products/by-url?url=https://www.g2.com/products/ghostwriter/reviews",
+    url: "/v1/products/by-url?url=https://www.capterra.com/p/184621/notion/",
     headers: auth(),
   });
   assert.equal(response.statusCode, 200);
   const body = response.json() as OkBody;
-  assert.equal(body.data.product.name, "Ghostwriter Labs");
-  assert.equal(body.data.scores.overall, null);
-  assert.notEqual(body.data.scores.overall, 0);
+  assert.equal(productCardSchema.safeParse(body.data).success, true);
+  assert.equal(body.data.product.name, "Notion");
+  assert.equal(body.data.product.directory, "capterra");
+  assert.equal(body.data.product.directorySlug, "notion");
+  assert.equal(body.data.product.id, "sr_prod_capterra_notion");
+  assert.equal(body.data.product.url, "https://www.capterra.com/p/notion/");
+  assert.equal(typeof body.data.scores.overall, "number");
+  assert.notEqual(body.data.scores.overall, null);
   assert.equal(body.data.scores.max, 5);
-  assert.equal(body.data.scores.reviewCount, null);
+  assert.equal(body.meta.creditsCharged, 1);
+  assert.deepEqual(body.data.sameAs, []);
+});
+
+test("product card directory comes from the adapter, not a hardcoded g2", async () => {
+  const { app } = await appWithKey();
+  const g2 = await app.inject({
+    method: "GET",
+    url: "/v1/products/by-url?url=https://www.g2.com/products/slack/reviews",
+    headers: auth(),
+  });
+  const capterra = await app.inject({
+    method: "GET",
+    url: "/v1/products/by-url?url=https://www.capterra.com/p/slack/",
+    headers: auth(),
+  });
+  assert.equal((g2.json() as OkBody).data.product.directory, "g2");
+  assert.equal((capterra.json() as OkBody).data.product.directory, "capterra");
+});
+
+test("missing overall stays null, never 0 (SPEC 6)", async () => {
+  const { app } = await appWithKey();
+  const g2 = await app.inject({
+    method: "GET",
+    url: "/v1/products/by-url?url=https://www.g2.com/products/ghostwriter/reviews",
+    headers: auth(),
+  });
+  assert.equal(g2.statusCode, 200);
+  const g2Body = g2.json() as OkBody;
+  assert.equal(g2Body.data.product.name, "Ghostwriter Labs");
+  assert.equal(g2Body.data.scores.overall, null);
+  assert.notEqual(g2Body.data.scores.overall, 0);
+  assert.equal(g2Body.data.scores.max, 5);
+  assert.equal(g2Body.data.scores.reviewCount, null);
+
+  const capterra = await app.inject({
+    method: "GET",
+    url: "/v1/products/by-url?url=https://www.capterra.com/p/ghostnote/",
+    headers: auth(),
+  });
+  assert.equal(capterra.statusCode, 200);
+  const capterraBody = capterra.json() as OkBody;
+  assert.equal(capterraBody.data.product.directory, "capterra");
+  assert.equal(capterraBody.data.scores.overall, null);
+  assert.notEqual(capterraBody.data.scores.overall, 0);
+  assert.equal(capterraBody.data.scores.max, 5);
 });
 
 test("unknown G2 slug is product_not_found 404 with 0 credits", async () => {
@@ -156,8 +231,44 @@ test("unknown G2 slug is product_not_found 404 with 0 credits", async () => {
   assert.equal(getCredits(db, keyRow.id), 12);
 });
 
-test("Capterra URL is directory_unsupported 422 and does not charge", async () => {
+test("unknown Capterra slug is product_not_found 404 and does not charge", async () => {
   const { app, db } = await appWithKey(8);
+  const keyRow = db
+    .prepare<[], { id: string }>("SELECT id FROM keys LIMIT 1")
+    .get();
+  assert.ok(keyRow);
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/products/by-url?url=https://www.capterra.com/p/not-a-real-saas/",
+    headers: auth(),
+  });
+  assert.equal(response.statusCode, 404);
+  const body = response.json() as ErrBody;
+  assert.equal(body.error.code, "product_not_found");
+  assert.equal(body.meta.creditsCharged, 0);
+  assert.equal(getCredits(db, keyRow.id), 8);
+});
+
+test("TrustRadius URL is directory_unsupported 422 and does not charge", async () => {
+  const { app, db } = await appWithKey(8);
+  const keyRow = db
+    .prepare<[], { id: string }>("SELECT id FROM keys LIMIT 1")
+    .get();
+  assert.ok(keyRow);
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/products/by-url?url=https://www.trustradius.com/products/slack/reviews",
+    headers: auth(),
+  });
+  assert.equal(response.statusCode, 422);
+  const body = response.json() as ErrBody;
+  assert.equal(body.error.code, "directory_unsupported");
+  assert.equal(body.meta.creditsCharged, 0);
+  assert.equal(getCredits(db, keyRow.id), 8);
+});
+
+test("Capterra URL is directory_unsupported when only the G2 adapter is wired", async () => {
+  const { app, db } = await appWithKey(8, registryOf(createG2FixtureAdapter()));
   const keyRow = db
     .prepare<[], { id: string }>("SELECT id FROM keys LIMIT 1")
     .get();

@@ -1,0 +1,17 @@
+{
+  "page": 1,
+  "hasMore": false,
+  "reviews": [
+    {
+      "id": "capterra_monday_r1",
+      "title": "Boards look great until there are twenty",
+      "body": "Color status is public to the workspace. Automations help until every team forks a board.",
+      "stars": 4,
+      "createdAt": "2025-07-11T00:00:00.000Z",
+      "reviewerTitle": "Operations Lead",
+      "industry": "Marketing and Advertising",
+      "companySize": "51-200",
+      "validated": true
+    }
+  ]
+}

@@ -30,7 +30,7 @@ export const productRoutes: FastifyPluginAsync = async (app) => {
       }
       const result = await getProductByUrl({
         db: request.server.db,
-        adapter: request.server.adapter,
+        adapters: request.server.adapters,
         key,
         url: request.query.url,
       });
@@ -56,7 +56,7 @@ export const productRoutes: FastifyPluginAsync = async (app) => {
       }
       const result = await getProductReviews({
         db: request.server.db,
-        adapter: request.server.adapter,
+        adapters: request.server.adapters,
         key,
         productId: request.params.id,
         page: request.query.page,

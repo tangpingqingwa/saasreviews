@@ -1,0 +1,17 @@
+{
+  "page": 1,
+  "hasMore": false,
+  "reviews": [
+    {
+      "id": "capterra_salesforce_r1",
+      "title": "Reports are the product, setup is the tax",
+      "body": "Pipeline reports are public to the org. Admins spend a quarter on page layouts before reps trust it.",
+      "stars": 4,
+      "createdAt": "2025-01-08T00:00:00.000Z",
+      "reviewerTitle": "Sales Ops",
+      "industry": "Information Technology and Services",
+      "companySize": "1001-5000",
+      "validated": true
+    }
+  ]
+}

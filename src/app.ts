@@ -1,5 +1,5 @@
 import Fastify, { type FastifyInstance } from "fastify";
-import { createAppAdapter, type DirectoryAdapter } from "./adapters/index.js";
+import { createAppAdapters, type AdapterLookup } from "./adapters/index.js";
 import { bootstrapKeyIfEmpty } from "./billing/keys.js";
 import { openDatabase, type SaasReviewsDb } from "./db.js";
 import { healthRoutes } from "./http/routes/health.js";
@@ -12,7 +12,7 @@ export type BuildAppOptions = {
   db?: SaasReviewsDb;
   databasePath?: string;
   bootstrapKey?: string;
-  adapter?: DirectoryAdapter;
+  adapters?: AdapterLookup;
 };
 
 export async function buildApp(
@@ -25,7 +25,7 @@ export async function buildApp(
     bootstrapKeyIfEmpty(db, options.bootstrapKey);
   }
   app.decorate("db", db);
-  app.decorate("adapter", options.adapter ?? createAppAdapter());
+  app.decorate("adapters", options.adapters ?? createAppAdapters());
   app.decorateRequest("apiKey", undefined);
   if (ownsDb) {
     app.addHook("onClose", async (instance) => {

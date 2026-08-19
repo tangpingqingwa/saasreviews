@@ -126,4 +126,22 @@ test("product card and review page match SPEC 5.1 / 5.2", () => {
     }).success,
     false,
   );
+
+  const capterraCard: ProductCard = {
+    product: {
+      id: "sr_prod_capterra_obsidian",
+      directory: "capterra",
+      directorySlug: "obsidian",
+      url: "https://www.capterra.com/p/obsidian/",
+      name: "Obsidian",
+    },
+    sameAs: [],
+    scores: { overall: 4.8, max: 5, reviewCount: 12 },
+    pricingTeaser: "Free for personal use",
+    categories: ["Note Taking"],
+    extractedAt: "2026-01-15T12:00:00.000Z",
+  };
+  assert.equal(productCardSchema.safeParse(capterraCard).success, true);
+  assert.equal(capterraCard.product.directory, "capterra");
+  assert.equal(capterraCard.scores.max, 5);
 });

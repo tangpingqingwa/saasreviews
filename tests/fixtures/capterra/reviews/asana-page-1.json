@@ -1,0 +1,17 @@
+{
+  "page": 1,
+  "hasMore": false,
+  "reviews": [
+    {
+      "id": "capterra_asana_r1",
+      "title": "Owners are obvious, email is not",
+      "body": "Task assignees are public on the board. Digest mail still fires after we closed the work.",
+      "stars": 4,
+      "createdAt": "2025-03-18T00:00:00.000Z",
+      "reviewerTitle": "Program Manager",
+      "industry": "Management Consulting",
+      "companySize": "51-200",
+      "validated": false
+    }
+  ]
+}

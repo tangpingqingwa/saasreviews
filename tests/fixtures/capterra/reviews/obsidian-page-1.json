@@ -1,0 +1,17 @@
+{
+  "page": 1,
+  "hasMore": false,
+  "reviews": [
+    {
+      "id": "capterra_obsidian_r1",
+      "title": "Local files, real links",
+      "body": "Markdown lives on disk so we are not locked in. Graph view is a toy; search is the reason we stay.",
+      "stars": 5,
+      "createdAt": "2025-09-03T00:00:00.000Z",
+      "reviewerTitle": "Staff Engineer",
+      "industry": "Computer Software",
+      "companySize": "11-50",
+      "validated": true
+    }
+  ]
+}

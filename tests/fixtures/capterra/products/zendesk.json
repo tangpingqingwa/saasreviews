@@ -1,0 +1,14 @@
+{
+  "product": {
+    "id": "sr_prod_capterra_zendesk",
+    "directory": "capterra",
+    "directorySlug": "zendesk",
+    "url": "https://www.capterra.com/p/zendesk/",
+    "name": "Zendesk"
+  },
+  "sameAs": [],
+  "scores": { "overall": 4.4, "max": 5, "reviewCount": 7340 },
+  "pricingTeaser": "Starts at $19 / agent / mo",
+  "categories": ["Help Desk", "Customer Support"],
+  "extractedAt": "2026-01-15T12:00:00.000Z"
+}

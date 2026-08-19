@@ -51,9 +51,40 @@ if grep -R --include='*.json' '"overall": 0' tests/fixtures/g2/products >/dev/nu
   fail "G2 product fixture invented overall 0"
 fi
 
-echo "== HTTP must not import adapters/g2 =="
-if [[ -d src/http ]] && grep -R --include='*.ts' -l 'adapters/g2' src/http >/dev/null 2>&1; then
-  fail "src/http imported adapters/g2"
+echo "== Capterra fixtures (PR 3) =="
+[[ -d tests/fixtures/capterra/products ]] || fail "missing tests/fixtures/capterra/products"
+[[ -d tests/fixtures/capterra/reviews ]] || fail "missing tests/fixtures/capterra/reviews"
+capterra_products="$(find tests/fixtures/capterra/products -name '*.json' | wc -l | tr -d ' ')"
+[[ "$capterra_products" -eq 10 ]] || fail "expected 10 Capterra product fixtures, got $capterra_products"
+[[ -f tests/fixtures/capterra/products/notion.json ]] || fail "missing notion Capterra product fixture"
+[[ -f tests/fixtures/capterra/products/ghostnote.json ]] || fail "missing missing-score Capterra fixture"
+[[ -f tests/fixtures/capterra/reviews/notion-page-1.json ]] || fail "missing notion Capterra review fixture"
+grep -q '"directory": "capterra"' tests/fixtures/capterra/products/notion.json \
+  || fail "Capterra notion fixture must set directory capterra"
+grep -q '"overall": null' tests/fixtures/capterra/products/ghostnote.json \
+  || fail "ghostnote fixture must keep overall null"
+if grep -R --include='*.json' '"overall": 0' tests/fixtures/capterra/products >/dev/null; then
+  fail "Capterra product fixture invented overall 0"
+fi
+if grep -R --include='*.json' '"max": 10' tests/fixtures/capterra/products >/dev/null; then
+  fail "Capterra fixture used max 10 without an explicit directory scale (v1 public stars are 5)"
+fi
+
+echo "== HTTP must not import adapters/* =="
+if [[ -d src/http ]]; then
+  if grep -R --include='*.ts' -l 'adapters/' src/http >/dev/null 2>&1; then
+    # fastify.d.ts may import AdapterLookup types only.
+    if grep -R --include='*.ts' --exclude='fastify.d.ts' -l 'adapters/' src/http >/dev/null 2>&1; then
+      fail "src/http imported adapters (routes must call core/* only)"
+    fi
+  fi
+fi
+
+echo "== product cards must use adapter.directory, not hardcoded g2 =="
+if [[ -f src/core/product.ts ]]; then
+  if grep -n 'directory: "g2"' src/core/product.ts >/dev/null; then
+    fail "src/core/product.ts hardcodes directory g2; use adapter.directory"
+  fi
 fi
 
 echo "== no live G2 / Capterra HTTP in core or adapters =="
@@ -61,9 +92,6 @@ if [[ -d src/adapters ]] || [[ -d src/core ]]; then
   if grep -RInE --include='*.ts' '(^|[^[:alnum:]_])(fetch|axios|got)\s*\(' src/adapters src/core >/dev/null; then
     fail "live HTTP client call in adapters/core (fixture adapter only)"
   fi
-fi
-if [[ -d src/adapters/capterra ]]; then
-  fail "Capterra adapter is PR 3; do not land it here"
 fi
 if [[ -f src/core/compare.ts ]] || [[ -f src/core/search.ts ]] || [[ -f src/core/categories.ts ]]; then
   fail "compare/search/categories are PR 4; do not land them here"
