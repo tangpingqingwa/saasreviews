@@ -1,0 +1,17 @@
+{
+  "page": 1,
+  "hasMore": false,
+  "reviews": [
+    {
+      "id": "capterra_clickup_r1",
+      "title": "One tool, too many views",
+      "body": "Docs, tasks, and chat live together. New hires pick a view at random and lose the same work twice.",
+      "stars": 4,
+      "createdAt": "2025-12-04T00:00:00.000Z",
+      "reviewerTitle": "Team Lead",
+      "industry": "Computer Software",
+      "companySize": "11-50",
+      "validated": false
+    }
+  ]
+}

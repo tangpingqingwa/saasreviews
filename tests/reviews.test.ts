@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
-import { createG2FixtureAdapter } from "../src/adapters/g2/fixture.js";
+import { createAppAdapters } from "../src/adapters/index.js";
 import { buildApp } from "../src/app.js";
 import { getCredits } from "../src/billing/credits.js";
 import { createKey } from "../src/billing/keys.js";
@@ -34,7 +34,7 @@ async function appWithKey(credits = 100) {
   createKey(db, { secret: KEY, credits });
   const app = await buildApp({
     db,
-    adapter: createG2FixtureAdapter(),
+    adapters: createAppAdapters(),
   });
   after(async () => {
     await app.close();
@@ -67,6 +67,28 @@ test("GET /v1/products/{id}/reviews returns public bodies (SPEC 3)", async () =>
     assert.equal(review.body.includes("sign in to continue"), false);
   }
   assert.equal(body.data.reviews[0]?.title, "Replaced our wiki and half our tickets");
+  assert.equal(body.meta.creditsCharged, 1);
+});
+
+test("Capterra reviews use the same page schema and public bodies", async () => {
+  const { app } = await appWithKey();
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/products/sr_prod_capterra_notion/reviews",
+    headers: auth(),
+  });
+  assert.equal(response.statusCode, 200);
+  const body = response.json() as OkBody;
+  assert.equal(reviewPageSchema.safeParse(body.data).success, true);
+  assert.equal(body.data.page, 1);
+  assert.equal(body.data.hasMore, true);
+  assert.ok(body.data.reviews.length >= 1);
+  for (const review of body.data.reviews) {
+    assert.ok(review.body.length > 0);
+    assert.equal(review.body.includes("login"), false);
+    assert.equal(review.body.includes("sign in to continue"), false);
+  }
+  assert.equal(body.data.reviews[0]?.title, "Wiki the whole company lives in");
   assert.equal(body.meta.creditsCharged, 1);
 });
 
@@ -108,6 +130,26 @@ test("review page 2 is a real second page, empty page is 200 not 404", async () 
   assert.equal(past.data.hasMore, false);
 });
 
+test("second Capterra review hit is cached and still charges 1", async () => {
+  const { app } = await appWithKey();
+  const first = await app.inject({
+    method: "GET",
+    url: "/v1/products/sr_prod_capterra_obsidian/reviews",
+    headers: auth(),
+  });
+  const second = await app.inject({
+    method: "GET",
+    url: "/v1/products/sr_prod_capterra_obsidian/reviews",
+    headers: auth(),
+  });
+  assert.equal(first.statusCode, 200);
+  assert.equal(second.statusCode, 200);
+  assert.equal((first.json() as OkBody).meta.cached, false);
+  assert.equal((second.json() as OkBody).meta.cached, true);
+  assert.equal((second.json() as OkBody).meta.creditsCharged, 1);
+  assert.equal((second.json() as OkBody).meta.upstreamMs, 0);
+});
+
 test("unknown product id and bad page do not invent reviews", async () => {
   const { app, db } = await appWithKey(9);
   const keyRow = db
@@ -124,13 +166,13 @@ test("unknown product id and bad page do not invent reviews", async () => {
   assert.equal((missing.json() as ErrBody).error.code, "product_not_found");
   assert.equal((missing.json() as ErrBody).meta.creditsCharged, 0);
 
-  const capterraId = await app.inject({
+  const missingCapterra = await app.inject({
     method: "GET",
-    url: "/v1/products/sr_prod_capterra_notion/reviews",
+    url: "/v1/products/sr_prod_capterra_not-a-real-saas/reviews",
     headers: auth(),
   });
-  assert.equal(capterraId.statusCode, 404);
-  assert.equal((capterraId.json() as ErrBody).error.code, "product_not_found");
+  assert.equal(missingCapterra.statusCode, 404);
+  assert.equal((missingCapterra.json() as ErrBody).error.code, "product_not_found");
 
   const badPage = await app.inject({
     method: "GET",

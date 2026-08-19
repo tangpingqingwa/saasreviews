@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { DirectoryAdapter } from "../adapters/types.js";
+import type { AdapterLookup, DirectoryAdapter } from "../adapters/index.js";
 import { chargeCredits, getCredits, PRODUCT_CREDIT_COST } from "../billing/credits.js";
 import type { Key } from "../billing/keys.js";
 import {
@@ -16,7 +16,7 @@ import {
   type Ok,
   type ProductCard,
 } from "../types.js";
-import { parseProductUrl } from "./url.js";
+import { parseProductUrl, productIdFor } from "./url.js";
 
 export const PRODUCT_BY_URL_ROUTE = "/v1/products/by-url" as const;
 
@@ -24,7 +24,7 @@ export type ProductOutcome = Ok<ProductCard> | Err;
 
 export type GetProductByUrlInput = {
   db: SaasReviewsDb;
-  adapter: DirectoryAdapter;
+  adapters: AdapterLookup;
   key: Key;
   url: string | undefined;
   requestId?: string;
@@ -50,12 +50,9 @@ export async function getProductByUrl(
   if (!parsed.ok) {
     return fail(parsed.code, requestId, parsed.message);
   }
-  if (parsed.directory !== input.adapter.directory) {
-    return fail(
-      "directory_unsupported",
-      requestId,
-      "Only G2 product URLs are supported in this milestone.",
-    );
+  const adapter = input.adapters.forDirectory(parsed.directory);
+  if (adapter === undefined) {
+    return fail("directory_unsupported", requestId);
   }
 
   const remaining = getCredits(input.db, input.key.id);
@@ -86,7 +83,7 @@ export async function getProductByUrl(
   const started = performance.now();
   let adapterResult;
   try {
-    adapterResult = await input.adapter.fetchProduct({
+    adapterResult = await adapter.fetchProduct({
       directory: parsed.directory,
       directorySlug: parsed.directorySlug,
       url: parsed.url,
@@ -103,7 +100,12 @@ export async function getProductByUrl(
     return fail(adapterResult.code, requestId);
   }
 
-  const card = normalizeCard(adapterResult.card, parsed.directorySlug, parsed.url);
+  const card = normalizeCard(
+    adapterResult.card,
+    adapter,
+    parsed.directorySlug,
+    parsed.url,
+  );
   setProductCache(input.db, cacheKey, JSON.stringify(card));
   return succeed(input, {
     data: card,
@@ -152,6 +154,7 @@ function fail(code: ErrorCode, requestId: string, message?: string): Err {
 
 function normalizeCard(
   card: ProductCard,
+  adapter: DirectoryAdapter,
   slug: string,
   url: string,
 ): ProductCard {
@@ -159,17 +162,25 @@ function normalizeCard(
     ...card,
     product: {
       ...card.product,
-      directory: "g2",
+      id: productIdFor(adapter.directory, slug),
+      directory: adapter.directory,
       directorySlug: slug,
       url,
     },
     sameAs: [],
     scores: {
       overall: missingOverall(card.scores.overall, card.scores.reviewCount),
-      max: card.scores.max,
+      max: statedMax(card.scores.max),
       reviewCount: card.scores.reviewCount,
     },
   };
+}
+
+function statedMax(max: number): number {
+  if (Number.isFinite(max) && max > 0) {
+    return max;
+  }
+  return 5;
 }
 
 function missingOverall(

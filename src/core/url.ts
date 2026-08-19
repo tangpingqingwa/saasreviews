@@ -9,10 +9,9 @@ export type ParsedDirectoryUrl =
     };
 
 const G2_HOSTS = new Set(["g2.com", "www.g2.com"]);
+const CAPTERRA_HOSTS = new Set(["capterra.com", "www.capterra.com"]);
 
 const KNOWN_UNSUPPORTED_HOSTS = new Set([
-  "capterra.com",
-  "www.capterra.com",
   "trustradius.com",
   "www.trustradius.com",
   "gartner.com",
@@ -65,11 +64,28 @@ export function parseProductUrl(raw: string | undefined): ParsedDirectoryUrl {
     };
   }
 
+  if (CAPTERRA_HOSTS.has(host)) {
+    const slug = capterraSlugFromPath(parsed.pathname);
+    if (slug === null) {
+      return {
+        ok: false,
+        code: "invalid_request",
+        message: "url is not a Capterra product URL.",
+      };
+    }
+    return {
+      ok: true,
+      directory: "capterra",
+      directorySlug: slug,
+      url: canonicalCapterraUrl(slug),
+    };
+  }
+
   if (KNOWN_UNSUPPORTED_HOSTS.has(host)) {
     return {
       ok: false,
       code: "directory_unsupported",
-      message: "Only G2 product URLs are supported in this milestone.",
+      message: "Directory is not g2 or capterra.",
     };
   }
 
@@ -84,15 +100,62 @@ export function canonicalG2Url(slug: string): string {
   return `https://www.g2.com/products/${slug}/reviews`;
 }
 
+export function canonicalCapterraUrl(slug: string): string {
+  return `https://www.capterra.com/p/${slug}/`;
+}
+
 export function g2SlugFromPath(pathname: string): string | null {
   const match = /^\/products\/([^/]+)(?:\/(?:reviews|pricing|features)?)?\/?$/.exec(
     pathname,
   );
-  if (match?.[1] === undefined || match[1] === "") {
+  return decodeSlug(match?.[1]);
+}
+
+/**
+ * Capterra public product pages are `/p/{id}/{slug}/` or `/p/{slug}/`.
+ * Numeric software ids are dropped so fixtures key on the slug.
+ */
+export function capterraSlugFromPath(pathname: string): string | null {
+  const numbered = /^\/p\/\d+\/([^/]+)(?:\/(?:reviews)?)?\/?$/.exec(pathname);
+  if (numbered) {
+    return decodeSlug(numbered[1]);
+  }
+  const slugged = /^\/p\/([^/]+)(?:\/(?:reviews)?)?\/?$/.exec(pathname);
+  if (slugged) {
+    const first = slugged[1];
+    if (first !== undefined && /^\d+$/.test(first)) {
+      return null;
+    }
+    return decodeSlug(first);
+  }
+  return null;
+}
+
+export function productIdFor(directory: Directory, slug: string): string {
+  return `sr_prod_${directory}_${slug}`;
+}
+
+export function parseProductId(
+  productId: string,
+): { directory: Directory; directorySlug: string } | null {
+  const match = /^sr_prod_(g2|capterra)_(.+)$/.exec(productId);
+  const directory = match?.[1];
+  const directorySlug = match?.[2];
+  if (directory !== "g2" && directory !== "capterra") {
+    return null;
+  }
+  if (directorySlug === undefined || directorySlug === "") {
+    return null;
+  }
+  return { directory, directorySlug };
+}
+
+function decodeSlug(value: string | undefined): string | null {
+  if (value === undefined || value === "") {
     return null;
   }
   try {
-    return decodeURIComponent(match[1]).toLowerCase();
+    return decodeURIComponent(value).toLowerCase();
   } catch {
     return null;
   }

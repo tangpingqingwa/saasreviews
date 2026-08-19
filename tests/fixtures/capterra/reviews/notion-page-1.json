@@ -1,0 +1,28 @@
+{
+  "page": 1,
+  "hasMore": true,
+  "reviews": [
+    {
+      "id": "capterra_notion_r1",
+      "title": "Wiki the whole company lives in",
+      "body": "Public pages replaced our shared drive. Permissions still surprise contractors on their first week.",
+      "stars": 5,
+      "createdAt": "2025-10-21T00:00:00.000Z",
+      "reviewerTitle": "Head of Ops",
+      "industry": "Internet",
+      "companySize": "51-200",
+      "validated": true
+    },
+    {
+      "id": "capterra_notion_r2",
+      "title": "Docs yes, dates no",
+      "body": "Specs stay in Notion. Engineering still tracks ship dates in Jira because timelines slip.",
+      "stars": 4,
+      "createdAt": "2025-08-09T00:00:00.000Z",
+      "reviewerTitle": "Product Manager",
+      "industry": "Computer Software",
+      "companySize": "201-500",
+      "validated": true
+    }
+  ]
+}

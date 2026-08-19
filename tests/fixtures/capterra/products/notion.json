@@ -1,0 +1,14 @@
+{
+  "product": {
+    "id": "sr_prod_capterra_notion",
+    "directory": "capterra",
+    "directorySlug": "notion",
+    "url": "https://www.capterra.com/p/notion/",
+    "name": "Notion"
+  },
+  "sameAs": [],
+  "scores": { "overall": 4.7, "max": 5, "reviewCount": 1890 },
+  "pricingTeaser": "Free plan available",
+  "categories": ["Knowledge Base", "Project Management", "Collaboration"],
+  "extractedAt": "2026-01-15T12:00:00.000Z"
+}

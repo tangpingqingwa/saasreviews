@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { DirectoryAdapter } from "../adapters/types.js";
+import type { AdapterLookup } from "../adapters/index.js";
 import {
   chargeCredits,
   getCredits,
@@ -21,6 +21,7 @@ import {
   type Review,
   type ReviewPage,
 } from "../types.js";
+import { parseProductId } from "./url.js";
 
 export const PRODUCT_REVIEWS_ROUTE = "/v1/products/{id}/reviews" as const;
 
@@ -28,7 +29,7 @@ export type ReviewsOutcome = Ok<ReviewPage> | Err;
 
 export type GetReviewsInput = {
   db: SaasReviewsDb;
-  adapter: DirectoryAdapter;
+  adapters: AdapterLookup;
   key: Key;
   productId: string;
   page?: string | number;
@@ -47,8 +48,6 @@ const ERROR_MESSAGE: Record<ErrorCode, string> = {
   internal: "Internal error.",
 };
 
-const PRODUCT_ID_PREFIX = "sr_prod_g2_";
-
 export function parseReviewPage(value: string | number | undefined): number | null {
   if (value === undefined || value === "") {
     return 1;
@@ -61,11 +60,10 @@ export function parseReviewPage(value: string | number | undefined): number | nu
 }
 
 export function directorySlugFromProductId(productId: string): string | null {
-  if (!isProductId(productId) || !productId.startsWith(PRODUCT_ID_PREFIX)) {
+  if (!isProductId(productId)) {
     return null;
   }
-  const slug = productId.slice(PRODUCT_ID_PREFIX.length);
-  return slug.length > 0 ? slug : null;
+  return parseProductId(productId)?.directorySlug ?? null;
 }
 
 export async function getProductReviews(
@@ -76,9 +74,15 @@ export async function getProductReviews(
   if (page === null) {
     return fail("invalid_request", requestId);
   }
-  const slug = directorySlugFromProductId(input.productId);
-  if (slug === null) {
+  const parsedId = isProductId(input.productId)
+    ? parseProductId(input.productId)
+    : null;
+  if (parsedId === null) {
     return fail("product_not_found", requestId);
+  }
+  const adapter = input.adapters.forDirectory(parsedId.directory);
+  if (adapter === undefined) {
+    return fail("directory_unsupported", requestId);
   }
 
   const remaining = getCredits(input.db, input.key.id);
@@ -89,7 +93,7 @@ export async function getProductReviews(
     return fail("payment_required", requestId);
   }
 
-  const cacheKey = reviewsCacheKey(input.adapter.directory, slug, page);
+  const cacheKey = reviewsCacheKey(adapter.directory, parsedId.directorySlug, page);
   const cached = getCacheEntry(input.db, cacheKey);
   if (cached.hit && cached.kind === "reviews") {
     const data = readCachedPage(cached.body);
@@ -106,9 +110,9 @@ export async function getProductReviews(
   const started = performance.now();
   let adapterResult;
   try {
-    adapterResult = await input.adapter.fetchReviews({
-      directory: input.adapter.directory,
-      directorySlug: slug,
+    adapterResult = await adapter.fetchReviews({
+      directory: adapter.directory,
+      directorySlug: parsedId.directorySlug,
       page,
     });
   } catch {
