@@ -1,0 +1,14 @@
+{
+  "product": {
+    "id": "sr_prod_g2_figma",
+    "directory": "g2",
+    "directorySlug": "figma",
+    "url": "https://www.g2.com/products/figma/reviews",
+    "name": "Figma"
+  },
+  "sameAs": [],
+  "scores": { "overall": 4.7, "max": 5, "reviewCount": 1420 },
+  "pricingTeaser": "Free starter plan",
+  "categories": ["Design", "Prototyping"],
+  "extractedAt": "2026-01-15T12:00:00.000Z"
+}

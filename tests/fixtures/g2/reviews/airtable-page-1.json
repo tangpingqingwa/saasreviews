@@ -1,0 +1,17 @@
+{
+  "page": 1,
+  "hasMore": false,
+  "reviews": [
+    {
+      "id": "g2_airtable_r1",
+      "title": "Spreadsheet people can share a real base",
+      "body": "Interfaces are public to the workspace. Record limits show up the week after a launch.",
+      "stars": 5,
+      "createdAt": "2025-01-30T00:00:00.000Z",
+      "reviewerTitle": "Operations Analyst",
+      "industry": "Nonprofit Organization Management",
+      "companySize": "11-50",
+      "validated": true
+    }
+  ]
+}

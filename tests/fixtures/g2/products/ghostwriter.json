@@ -1,0 +1,14 @@
+{
+  "product": {
+    "id": "sr_prod_g2_ghostwriter",
+    "directory": "g2",
+    "directorySlug": "ghostwriter",
+    "url": "https://www.g2.com/products/ghostwriter/reviews",
+    "name": "Ghostwriter Labs"
+  },
+  "sameAs": [],
+  "scores": { "overall": null, "max": 5, "reviewCount": null },
+  "pricingTeaser": null,
+  "categories": ["Writing"],
+  "extractedAt": "2026-01-15T12:00:00.000Z"
+}
