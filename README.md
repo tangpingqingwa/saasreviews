@@ -1,5 +1,7 @@
 # SaaSReviews
 
+Build contract: [SPEC.md](./SPEC.md).
+
 Public SaaS reviews from G2, Capterra, and similar directories. One schema for product pages and review lists.
 
 G2 and Capterra sell data to enterprises. Developers and agents who want “what do reviews say about Notion vs Obsidian” get HTML or a $20k contract.
