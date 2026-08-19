@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  categoryPageSchema,
+  compareResultSchema,
   DIRECTORIES,
   isDirectory,
   isProductId,
@@ -10,6 +12,7 @@ import {
   productRefSchema,
   productScoresSchema,
   reviewPageSchema,
+  searchPageSchema,
   type ProductCard,
   type ProductRef,
   type ProductScores,
@@ -144,4 +147,59 @@ test("product card and review page match SPEC 5.1 / 5.2", () => {
   assert.equal(productCardSchema.safeParse(capterraCard).success, true);
   assert.equal(capterraCard.product.directory, "capterra");
   assert.equal(capterraCard.scores.max, 5);
+});
+
+test("compare, search, and category pages match SPEC 5.3–5.5", () => {
+  const card: ProductCard = {
+    product: {
+      id: "sr_prod_g2_notion",
+      directory: "g2",
+      directorySlug: "notion",
+      url: "https://www.g2.com/products/notion/reviews",
+      name: "Notion",
+    },
+    sameAs: [],
+    scores: { overall: 4.7, max: 5, reviewCount: 10 },
+    pricingTeaser: null,
+    categories: ["Knowledge Base"],
+    extractedAt: "2026-01-15T12:00:00.000Z",
+  };
+  assert.equal(
+    compareResultSchema.safeParse({
+      a: card,
+      b: { ...card, scores: { overall: null, max: 5, reviewCount: null } },
+      scoreDelta: null,
+      warning: "unmatched",
+    }).success,
+    true,
+  );
+  assert.equal(
+    compareResultSchema.safeParse({
+      a: card,
+      b: card,
+      scoreDelta: 0,
+      warning: "merged",
+    }).success,
+    false,
+  );
+  assert.equal(
+    searchPageSchema.safeParse({
+      q: "notion",
+      directory: "g2",
+      page: 1,
+      hasMore: false,
+      products: [card],
+    }).success,
+    true,
+  );
+  assert.equal(
+    categoryPageSchema.safeParse({
+      slug: "knowledge-base",
+      directory: "capterra",
+      page: 1,
+      hasMore: false,
+      products: [card],
+    }).success,
+    true,
+  );
 });

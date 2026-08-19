@@ -1,22 +1,11 @@
 import { randomUUID } from "node:crypto";
-import type { AdapterLookup, DirectoryAdapter } from "../adapters/index.js";
+import type { AdapterLookup } from "../adapters/index.js";
 import { chargeCredits, getCredits, PRODUCT_CREDIT_COST } from "../billing/credits.js";
 import type { Key } from "../billing/keys.js";
-import {
-  getCacheEntry,
-  productCacheKey,
-  setCacheTombstone,
-  setProductCache,
-} from "../cache/store.js";
 import type { SaasReviewsDb } from "../db.js";
-import {
-  productCardSchema,
-  type Err,
-  type ErrorCode,
-  type Ok,
-  type ProductCard,
-} from "../types.js";
-import { parseProductUrl, productIdFor } from "./url.js";
+import type { Err, ErrorCode, Ok, ProductCard } from "../types.js";
+import { loadProductCard } from "./load.js";
+import { parseProductUrl } from "./url.js";
 
 export const PRODUCT_BY_URL_ROUTE = "/v1/products/by-url" as const;
 
@@ -63,55 +52,21 @@ export async function getProductByUrl(
     return fail("payment_required", requestId);
   }
 
-  const cacheKey = productCacheKey(parsed.directory, parsed.directorySlug);
-  const cached = getCacheEntry(input.db, cacheKey);
-  if (cached.hit && cached.kind === "product") {
-    const data = readCachedCard(cached.body);
-    if (data !== null) {
-      return succeed(input, {
-        data,
-        cached: true,
-        requestId,
-        upstreamMs: 0,
-      });
-    }
-  }
-  if (cached.hit && cached.kind === "tombstone") {
-    return fail(cached.errorCode, requestId);
-  }
-
-  const started = performance.now();
-  let adapterResult;
-  try {
-    adapterResult = await adapter.fetchProduct({
-      directory: parsed.directory,
-      directorySlug: parsed.directorySlug,
-      url: parsed.url,
-    });
-  } catch {
-    return fail("internal", requestId);
-  }
-  const upstreamMs = Math.max(0, Math.round(performance.now() - started));
-
-  if (!adapterResult.ok) {
-    if (adapterResult.code === "product_not_found") {
-      setCacheTombstone(input.db, cacheKey, adapterResult.code);
-    }
-    return fail(adapterResult.code, requestId);
-  }
-
-  const card = normalizeCard(
-    adapterResult.card,
+  const loaded = await loadProductCard({
+    db: input.db,
     adapter,
-    parsed.directorySlug,
-    parsed.url,
-  );
-  setProductCache(input.db, cacheKey, JSON.stringify(card));
+    directory: parsed.directory,
+    directorySlug: parsed.directorySlug,
+    url: parsed.url,
+  });
+  if (!loaded.ok) {
+    return fail(loaded.code, requestId);
+  }
   return succeed(input, {
-    data: card,
-    cached: false,
+    data: loaded.card,
+    cached: loaded.cached,
     requestId,
-    upstreamMs,
+    upstreamMs: loaded.upstreamMs,
   });
 }
 
@@ -152,61 +107,8 @@ function fail(code: ErrorCode, requestId: string, message?: string): Err {
   };
 }
 
-function normalizeCard(
-  card: ProductCard,
-  adapter: DirectoryAdapter,
-  slug: string,
-  url: string,
-): ProductCard {
-  return {
-    ...card,
-    product: {
-      ...card.product,
-      id: productIdFor(adapter.directory, slug),
-      directory: adapter.directory,
-      directorySlug: slug,
-      url,
-    },
-    sameAs: [],
-    scores: {
-      overall: missingOverall(card.scores.overall, card.scores.reviewCount),
-      max: statedMax(card.scores.max),
-      reviewCount: card.scores.reviewCount,
-    },
-  };
-}
-
-function statedMax(max: number): number {
-  if (Number.isFinite(max) && max > 0) {
-    return max;
-  }
-  return 5;
-}
-
-function missingOverall(
-  overall: number | null,
-  reviewCount: number | null,
-): number | null {
-  if (overall === null) {
-    return null;
-  }
-  if (overall === 0 && (reviewCount === null || reviewCount === 0)) {
-    return null;
-  }
-  return overall;
-}
-
 function isRetryableCode(code: ErrorCode): boolean {
   return code === "rate_limited" || code === "upstream_blocked" || code === "internal";
-}
-
-function readCachedCard(body: string): ProductCard | null {
-  try {
-    const parsed = productCardSchema.safeParse(JSON.parse(body));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
-  }
 }
 
 function newRequestId(): string {

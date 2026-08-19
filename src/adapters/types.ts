@@ -39,4 +39,5 @@ export type DirectoryAdapter = {
   directory: Directory;
   fetchProduct(request: AdapterProductRequest): Promise<AdapterProductResult>;
   fetchReviews(request: AdapterReviewsRequest): Promise<AdapterReviewsResult>;
+  listProducts(): ProductCard[];
 };

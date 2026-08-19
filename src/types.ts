@@ -51,6 +51,31 @@ export const reviewPageSchema = z.object({
   reviews: z.array(reviewSchema),
 });
 
+export const compareWarningSchema = z.literal("unmatched");
+
+export const compareResultSchema = z.object({
+  a: productCardSchema,
+  b: productCardSchema,
+  scoreDelta: z.number().nullable(),
+  warning: compareWarningSchema.nullable(),
+});
+
+export const searchPageSchema = z.object({
+  q: z.string(),
+  directory: directorySchema,
+  page: z.number().int().positive(),
+  hasMore: z.boolean(),
+  products: z.array(productCardSchema),
+});
+
+export const categoryPageSchema = z.object({
+  slug: z.string(),
+  directory: directorySchema,
+  page: z.number().int().positive(),
+  hasMore: z.boolean(),
+  products: z.array(productCardSchema),
+});
+
 export const usageDaySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   credits: z.number().int().nonnegative(),
@@ -70,6 +95,9 @@ export type ProductScores = z.infer<typeof productScoresSchema>;
 export type ProductCard = z.infer<typeof productCardSchema>;
 export type Review = z.infer<typeof reviewSchema>;
 export type ReviewPage = z.infer<typeof reviewPageSchema>;
+export type CompareResult = z.infer<typeof compareResultSchema>;
+export type SearchPage = z.infer<typeof searchPageSchema>;
+export type CategoryPage = z.infer<typeof categoryPageSchema>;
 export type UsageDay = z.infer<typeof usageDaySchema>;
 
 export type ErrorCode =

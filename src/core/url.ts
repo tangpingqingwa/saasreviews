@@ -1,4 +1,4 @@
-import type { Directory, ErrorCode } from "../types.js";
+import { parseDirectory, type Directory, type ErrorCode } from "../types.js";
 
 export type ParsedDirectoryUrl =
   | { ok: true; directory: Directory; directorySlug: string; url: string }
@@ -133,6 +133,38 @@ export function capterraSlugFromPath(pathname: string): string | null {
 
 export function productIdFor(directory: Directory, slug: string): string {
   return `sr_prod_${directory}_${slug}`;
+}
+
+export function canonicalProductUrl(directory: Directory, slug: string): string {
+  return directory === "g2" ? canonicalG2Url(slug) : canonicalCapterraUrl(slug);
+}
+
+export function parseRequiredDirectory(
+  value: string | undefined,
+):
+  | { ok: true; value: Directory }
+  | {
+      ok: false;
+      code: Extract<ErrorCode, "invalid_request" | "directory_unsupported">;
+      message: string;
+    } {
+  const trimmed = value?.trim();
+  if (trimmed === undefined || trimmed === "") {
+    return {
+      ok: false,
+      code: "invalid_request",
+      message: "Provide directory=g2 or directory=capterra.",
+    };
+  }
+  const directory = parseDirectory(trimmed);
+  if (directory === null) {
+    return {
+      ok: false,
+      code: "directory_unsupported",
+      message: "Directory is not g2 or capterra.",
+    };
+  }
+  return { ok: true, value: directory };
 }
 
 export function parseProductId(
