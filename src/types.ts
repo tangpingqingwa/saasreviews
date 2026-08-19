@@ -24,6 +24,33 @@ export const productScoresSchema = z.object({
   reviewCount: z.number().int().nullable(),
 });
 
+export const productCardSchema = z.object({
+  product: productRefSchema,
+  sameAs: z.array(productRefSchema),
+  scores: productScoresSchema,
+  pricingTeaser: z.string().nullable(),
+  categories: z.array(z.string()),
+  extractedAt: z.string().min(1),
+});
+
+export const reviewSchema = z.object({
+  id: z.string().nullable(),
+  title: z.string().nullable(),
+  body: z.string().min(1),
+  stars: z.number().nullable(),
+  createdAt: z.string().nullable(),
+  reviewerTitle: z.string().nullable(),
+  industry: z.string().nullable(),
+  companySize: z.string().nullable(),
+  validated: z.boolean().nullable(),
+});
+
+export const reviewPageSchema = z.object({
+  page: z.number().int().positive(),
+  hasMore: z.boolean(),
+  reviews: z.array(reviewSchema),
+});
+
 export const usageDaySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   credits: z.number().int().nonnegative(),
@@ -40,6 +67,9 @@ export type KeyPrefix = z.infer<typeof keyPrefixSchema>;
 export type Plan = z.infer<typeof planSchema>;
 export type ProductRef = z.infer<typeof productRefSchema>;
 export type ProductScores = z.infer<typeof productScoresSchema>;
+export type ProductCard = z.infer<typeof productCardSchema>;
+export type Review = z.infer<typeof reviewSchema>;
+export type ReviewPage = z.infer<typeof reviewPageSchema>;
 export type UsageDay = z.infer<typeof usageDaySchema>;
 
 export type ErrorCode =

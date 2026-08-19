@@ -1,0 +1,14 @@
+{
+  "product": {
+    "id": "sr_prod_g2_zendesk",
+    "directory": "g2",
+    "directorySlug": "zendesk",
+    "url": "https://www.g2.com/products/zendesk/reviews",
+    "name": "Zendesk"
+  },
+  "sameAs": [],
+  "scores": { "overall": 4.3, "max": 5, "reviewCount": 6120 },
+  "pricingTeaser": "Starts at $19 / agent / mo",
+  "categories": ["Help Desk", "Customer Support"],
+  "extractedAt": "2026-01-15T12:00:00.000Z"
+}

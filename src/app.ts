@@ -1,8 +1,10 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import { createAppAdapter, type DirectoryAdapter } from "./adapters/index.js";
 import { bootstrapKeyIfEmpty } from "./billing/keys.js";
 import { openDatabase, type SaasReviewsDb } from "./db.js";
 import { healthRoutes } from "./http/routes/health.js";
 import { meRoutes } from "./http/routes/me.js";
+import { productRoutes } from "./http/routes/products.js";
 import { usageRoutes } from "./http/routes/usage.js";
 
 export type BuildAppOptions = {
@@ -10,6 +12,7 @@ export type BuildAppOptions = {
   db?: SaasReviewsDb;
   databasePath?: string;
   bootstrapKey?: string;
+  adapter?: DirectoryAdapter;
 };
 
 export async function buildApp(
@@ -22,6 +25,7 @@ export async function buildApp(
     bootstrapKeyIfEmpty(db, options.bootstrapKey);
   }
   app.decorate("db", db);
+  app.decorate("adapter", options.adapter ?? createAppAdapter());
   app.decorateRequest("apiKey", undefined);
   if (ownsDb) {
     app.addHook("onClose", async (instance) => {
@@ -31,5 +35,6 @@ export async function buildApp(
   await app.register(healthRoutes);
   await app.register(meRoutes);
   await app.register(usageRoutes);
+  await app.register(productRoutes);
   return app;
 }

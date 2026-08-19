@@ -1,0 +1,17 @@
+{
+  "page": 1,
+  "hasMore": false,
+  "reviews": [
+    {
+      "id": "g2_salesforce_r1",
+      "title": "Flexible, never finished",
+      "body": "We report pipeline from Sales Cloud. Admins spend a quarter on page layouts after every org merge.",
+      "stars": 3,
+      "createdAt": "2025-05-11T00:00:00.000Z",
+      "reviewerTitle": "Salesforce Admin",
+      "industry": "Information Technology and Services",
+      "companySize": "5001-10000",
+      "validated": true
+    }
+  ]
+}

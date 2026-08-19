@@ -1,0 +1,28 @@
+{
+  "page": 1,
+  "hasMore": false,
+  "reviews": [
+    {
+      "id": "g2_slack_r1",
+      "title": "Default chat, noisy without rules",
+      "body": "Public channels work. Without naming rules the #random sprawl hides decisions.",
+      "stars": 4,
+      "createdAt": "2025-10-12T00:00:00.000Z",
+      "reviewerTitle": "IT Admin",
+      "industry": "Financial Services",
+      "companySize": "1001-5000",
+      "validated": true
+    },
+    {
+      "id": "g2_slack_r2",
+      "title": "Huddles replaced half our standups",
+      "body": "Huddles are public-enough for our remote squad. Search across years is the paid reason.",
+      "stars": 5,
+      "createdAt": "2025-08-01T00:00:00.000Z",
+      "reviewerTitle": "Engineering Manager",
+      "industry": "Computer Software",
+      "companySize": "201-500",
+      "validated": true
+    }
+  ]
+}
