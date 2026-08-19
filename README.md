@@ -1,6 +1,7 @@
 # SaaSReviews
 
 Build contract: [SPEC.md](./SPEC.md).
+How we work: [CONTRIBUTING.md](./CONTRIBUTING.md). `main` stays buildable and testable.
 
 Public SaaS reviews from G2, Capterra, and similar directories. One schema for product pages and review lists.
 
