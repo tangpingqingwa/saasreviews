@@ -47,6 +47,26 @@ test("loadConfig requires SAASREVIEWS_DATABASE in production", () => {
   });
   assert.equal(config.databasePath, "/tmp/saasreviews.sqlite");
   assert.equal(config.bootstrapKey, "sr_test_dev");
+  assert.equal(config.adapterMode, "fixture");
+});
+
+test("loadConfig keeps fixture adapters unless live directories are explicitly enabled", () => {
+  assert.equal(loadConfig({}).adapterMode, "fixture");
+  assert.equal(
+    loadConfig({ SAASREVIEWS_LIVE_DIRECTORIES: "1" }).adapterMode,
+    "live",
+  );
+  assert.equal(
+    loadConfig({
+      SAASREVIEWS_LIVE_DIRECTORIES: "1",
+      SAASREVIEWS_FIXTURE_ONLY: "1",
+    }).adapterMode,
+    "fixture",
+  );
+  assert.equal(
+    loadConfig({ SAASREVIEWS_LIVE_DIRECTORIES: "0" }).adapterMode,
+    "fixture",
+  );
 });
 
 test("createKey stores a hash and lookupKey finds only sr_live_ / sr_test_ secrets", () => {
