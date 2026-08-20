@@ -63,10 +63,71 @@ export function parseDirectoryReviewsHtml(
   page: number,
 ): ParsedDirectoryReviews {
   const fromJsonLd = reviewsFromJsonLd(html);
-  const reviews = fromJsonLd.length > 0 ? fromJsonLd : reviewsFromDom(html);
+  const fromDom = fromJsonLd.length > 0 ? [] : reviewsFromDom(html);
+  const reviews =
+    fromJsonLd.length > 0
+      ? fromJsonLd
+      : fromDom.length > 0
+        ? fromDom
+        : reviewsFromRss(html);
   return {
     reviews: reviews.filter((review) => review.body.trim() !== ""),
     hasMore: inferHasMore(html, page, reviews.length),
+  };
+}
+
+/** Public G2 `reviews.rss` channel. Name only — no invented overall. */
+export function parseG2ReviewsRssProduct(
+  xml: string,
+): ParsedDirectoryProduct | null {
+  if (!looksLikeRss(xml)) {
+    return null;
+  }
+  const channel = firstMatch(xml, /<channel\b[^>]*>([\s\S]*?)<\/channel>/i);
+  if (channel === null) {
+    return null;
+  }
+  const rawTitle = firstMatch(channel, /<title\b[^>]*>([\s\S]*?)<\/title>/i);
+  if (rawTitle === null) {
+    return null;
+  }
+  const name = cleanProductName(rawTitle, "g2");
+  if (name === "") {
+    return null;
+  }
+  return {
+    name,
+    overall: null,
+    max: DEFAULT_STAR_MAX,
+    reviewCount: null,
+    pricingTeaser: null,
+    categories: [],
+  };
+}
+
+/** Public G2 `reviews.rss` items. Star 0 stays null. */
+export function parseG2ReviewsRss(
+  xml: string,
+  page: number,
+): ParsedDirectoryReviews | null {
+  if (!looksLikeRss(xml)) {
+    return null;
+  }
+  const reviews: Review[] = [];
+  const itemRe = /<item\b[^>]*>([\s\S]*?)<\/item>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = itemRe.exec(xml)) !== null) {
+    const parsed = reviewFromRssItem(match[1] ?? "");
+    if (parsed !== null) {
+      reviews.push(parsed);
+    }
+  }
+  if (reviews.length === 0 && parseG2ReviewsRssProduct(xml) === null) {
+    return null;
+  }
+  return {
+    reviews,
+    hasMore: page === 1 && reviews.length > 0,
   };
 }
 
@@ -348,6 +409,60 @@ function inferHasMore(html: string, page: number, reviewCount: number): boolean 
     return true;
   }
   return reviewCount > 0 && /next\s*(?:page)?/i.test(html);
+}
+
+function looksLikeRss(body: string): boolean {
+  const head = body.slice(0, 800).toLowerCase();
+  return head.includes("<rss") || head.includes("<channel");
+}
+
+function reviewFromRssItem(item: string): Review | null {
+  const description =
+    firstMatch(item, /<description\b[^>]*>([\s\S]*?)<\/description>/i) ??
+    firstMatch(item, /<content:encoded\b[^>]*>([\s\S]*?)<\/content:encoded>/i);
+  if (description === null) {
+    return null;
+  }
+  const body = stripTags(description);
+  if (body === "" || /sign in to (view|read)/i.test(body)) {
+    return null;
+  }
+  const titleRaw = firstMatch(item, /<title\b[^>]*>([\s\S]*?)<\/title>/i);
+  const title = titleRaw === null ? null : stripTags(titleRaw);
+  const stars = starsFromRssBody(body);
+  const createdAt =
+    firstMatch(item, /<pubDate\b[^>]*>([\s\S]*?)<\/pubDate>/i) ??
+    firstMatch(item, /<dc:date\b[^>]*>([\s\S]*?)<\/dc:date>/i);
+  const guid =
+    firstMatch(item, /<guid\b[^>]*>([\s\S]*?)<\/guid>/i) ??
+    firstMatch(item, /<link\b[^>]*>([\s\S]*?)<\/link>/i);
+  const industry = firstMatch(body, /Review from[^\n.]*?\bin\s+([^.<]+)/i);
+  const reviewerTitle = firstMatch(body, /role:\s*([^<\n]+)/i);
+  const companySize = firstMatch(body, /size:\s*([^<\n]+)/i);
+  return {
+    id: guid === null ? null : stripTags(guid),
+    title: title === "" ? null : title,
+    body,
+    stars: stars === 0 ? null : stars,
+    createdAt: createdAt === null ? null : isoFromUnknown(createdAt),
+    reviewerTitle: reviewerTitle === null ? null : stripTags(reviewerTitle),
+    industry: industry === null ? null : stripTags(industry),
+    companySize: companySize === null ? null : stripTags(companySize),
+    validated: /verified user/i.test(body) ? true : null,
+  };
+}
+
+function starsFromRssBody(body: string): number | null {
+  const match = /(\d+(?:\.\d+)?)\s*stars?\b/i.exec(body);
+  if (match === null) {
+    return null;
+  }
+  return numberFromUnknown(match[1]);
+}
+
+function reviewsFromRss(body: string): Review[] {
+  const parsed = parseG2ReviewsRss(body, 1);
+  return parsed === null ? [] : parsed.reviews;
 }
 
 function cleanProductName(name: string, directory: Directory): string {

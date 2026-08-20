@@ -10,7 +10,12 @@ import {
   registryOf,
 } from "../src/adapters/index.js";
 import { looksLikeBotWall, mapHttpFailure } from "../src/adapters/http.js";
-import { parseDirectoryProductHtml, parseDirectoryReviewsHtml } from "../src/adapters/parse.js";
+import {
+  parseDirectoryProductHtml,
+  parseDirectoryReviewsHtml,
+  parseG2ReviewsRss,
+  parseG2ReviewsRssProduct,
+} from "../src/adapters/parse.js";
 import { buildApp } from "../src/app.js";
 import { getCredits } from "../src/billing/credits.js";
 import { createKey } from "../src/billing/keys.js";
@@ -27,8 +32,10 @@ const KEY = "sr_test_live_directories";
 const G2_NOTION = readFileSync(join(HTML, "g2-notion.html"), "utf8");
 const G2_GHOST = readFileSync(join(HTML, "g2-ghostwriter.html"), "utf8");
 const G2_NOTION_P2 = readFileSync(join(HTML, "g2-notion-reviews-page-2.html"), "utf8");
+const G2_NOTION_RSS = readFileSync(join(HTML, "g2-notion.rss"), "utf8");
 const CAP_NOTION = readFileSync(join(HTML, "capterra-notion.html"), "utf8");
 const CAP_GHOST = readFileSync(join(HTML, "capterra-ghostnote.html"), "utf8");
+const CAP_CA_NOTION = readFileSync(join(HTML, "capterra-ca-notion.html"), "utf8");
 const BOT_WALL = readFileSync(join(HTML, "bot-wall.html"), "utf8");
 
 type OkBody<T> = {
@@ -49,6 +56,13 @@ function recordedFetch(url: string): Promise<DirectoryHttpResponse> {
   if (url.includes("g2.com/products/notion") && url.includes("page=2")) {
     return Promise.resolve(htmlResponse(G2_NOTION_P2));
   }
+  if (url.includes("g2.com/products/notion/reviews.rss")) {
+    return Promise.resolve({
+      status: 200,
+      body: G2_NOTION_RSS,
+      headers: { "content-type": "application/rss+xml" },
+    });
+  }
   if (url.includes("g2.com/products/notion")) {
     return Promise.resolve(htmlResponse(G2_NOTION));
   }
@@ -67,10 +81,33 @@ function recordedFetch(url: string): Promise<DirectoryHttpResponse> {
   if (url.includes("capterra.com/p/ghostnote")) {
     return Promise.resolve(htmlResponse(CAP_GHOST));
   }
-  if (url.includes("capterra.com/p/missing-saas")) {
+  if (url.includes("capterra.com/p/missing-saas") || url.includes("capterra.com/software/missing-saas")) {
     return Promise.resolve(htmlResponse("gone", 404));
   }
+  if (url.includes("capterra.ca/software/186596/notion")) {
+    return Promise.resolve(htmlResponse(CAP_CA_NOTION));
+  }
+  if (url.includes("capterra.") && (url.includes("/p/") || url.includes("/software/"))) {
+    return Promise.resolve(htmlResponse(BOT_WALL, 403));
+  }
   throw new Error(`recorded fetch has no HTML for ${url}`);
+}
+
+function walledThenPublicFetch(url: string): Promise<DirectoryHttpResponse> {
+  if (url.includes("g2.com/products/notion/reviews.rss")) {
+    return Promise.resolve({
+      status: 200,
+      body: G2_NOTION_RSS,
+      headers: { "content-type": "application/rss+xml" },
+    });
+  }
+  if (url.includes("capterra.ca/software/186596/notion")) {
+    return Promise.resolve(htmlResponse(CAP_CA_NOTION));
+  }
+  if (url.includes("g2.com") || url.includes("capterra.")) {
+    return Promise.resolve(htmlResponse(BOT_WALL, 403));
+  }
+  throw new Error(`walled fetch has no recording for ${url}`);
 }
 
 function liveAdapters() {
@@ -146,6 +183,22 @@ test("Capterra HTML parser uses the same schema and stated max 5", () => {
   assert.ok(ghost);
   assert.equal(ghost.overall, null);
   assert.notEqual(ghost.overall, 0);
+});
+
+test("G2 reviews.rss parser keeps name and public bodies; overall stays null", () => {
+  const product = parseG2ReviewsRssProduct(G2_NOTION_RSS);
+  assert.ok(product);
+  assert.equal(product.name, "Notion");
+  assert.equal(product.overall, null);
+  assert.equal(product.max, 5);
+  assert.equal(product.reviewCount, null);
+
+  const page = parseG2ReviewsRss(G2_NOTION_RSS, 1);
+  assert.ok(page);
+  assert.ok(page.reviews.length >= 1);
+  assert.equal(page.reviews[0]?.stars, 4.5);
+  assert.ok((page.reviews[0]?.body.length ?? 0) > 0);
+  assert.equal(page.reviews.some((review) => review.stars === 0), false);
 });
 
 test("review parser keeps public bodies and never keeps star 0", () => {
@@ -268,6 +321,77 @@ test("live reviews return public bodies (SPEC 3)", async () => {
     (second.json() as OkBody<ReviewPage>).data.reviews[0]?.body ?? "",
     /clone a public template/i,
   );
+});
+
+test("live G2 falls back to public reviews.rss when HTML is a bot wall", async () => {
+  const db = openDatabase(":memory:");
+  createKey(db, { secret: KEY, credits: 10 });
+  const app = await buildApp({
+    db,
+    adapters: registryOf(
+      createG2LiveAdapter({ fetch: walledThenPublicFetch }),
+      createCapterraLiveAdapter({ fetch: walledThenPublicFetch }),
+    ),
+  });
+  after(async () => {
+    await app.close();
+    db.close();
+  });
+
+  const product = await app.inject({
+    method: "GET",
+    url: "/v1/products/by-url?url=https://www.g2.com/products/notion/reviews",
+    headers: auth(),
+  });
+  assert.equal(product.statusCode, 200);
+  const card = product.json() as OkBody<ProductCard>;
+  assert.equal(card.data.product.name, "Notion");
+  assert.equal(card.data.product.directory, "g2");
+  assert.equal(card.data.scores.overall, null);
+  assert.equal(card.data.scores.max, 5);
+  assert.equal(card.meta.creditsCharged, 1);
+
+  const reviews = await app.inject({
+    method: "GET",
+    url: "/v1/products/sr_prod_g2_notion/reviews?page=1",
+    headers: auth(),
+  });
+  assert.equal(reviews.statusCode, 200);
+  const page = (reviews.json() as OkBody<ReviewPage>).data;
+  assert.ok(page.reviews.length >= 1);
+  assert.ok((page.reviews[0]?.body.length ?? 0) > 0);
+  assert.equal(page.reviews[0]?.stars, 4.5);
+});
+
+test("live Capterra falls back to a regional public page when .com is walled", async () => {
+  const db = openDatabase(":memory:");
+  createKey(db, { secret: KEY, credits: 10 });
+  const app = await buildApp({
+    db,
+    adapters: registryOf(
+      createG2LiveAdapter({ fetch: walledThenPublicFetch }),
+      createCapterraLiveAdapter({ fetch: walledThenPublicFetch }),
+    ),
+  });
+  after(async () => {
+    await app.close();
+    db.close();
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/products/by-url?url=https://www.capterra.com/p/186596/Notion/",
+    headers: auth(),
+  });
+  assert.equal(response.statusCode, 200);
+  const body = response.json() as OkBody<ProductCard>;
+  assert.equal(body.data.product.name, "Notion");
+  assert.equal(body.data.product.directory, "capterra");
+  assert.equal(body.data.product.url, "https://www.capterra.com/p/notion/");
+  assert.equal(body.data.scores.overall, 4.7);
+  assert.equal(body.data.scores.max, 5);
+  assert.equal(body.data.scores.reviewCount, 2799);
+  assert.equal(body.meta.creditsCharged, 1);
 });
 
 test("live unmatched compare returns both cards + warning unmatched (SPEC 5)", async () => {
