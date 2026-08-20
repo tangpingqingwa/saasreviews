@@ -49,6 +49,7 @@ MCP: `get_saas`, `list_reviews`, `compare_saas`.
 - Compare is two cached reads plus a merge, not a live double scrape when possible
 - No screenshot hosting of badges
 - Directory HTML changes: fixture tests first
+- Default adapters are recorded JSON fixtures. Live G2/Capterra HTML is opt-in via `SAASREVIEWS_LIVE_DIRECTORIES=1` (CI sets `SAASREVIEWS_FIXTURE_ONLY=1` and never fetches)
 
 ## Business model
 

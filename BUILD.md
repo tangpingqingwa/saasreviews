@@ -44,7 +44,7 @@ Credits **2** always when both lookups succeed (including unmatched).
 ## 4. Tests
 
 Fixtures first: product cards, review pages, missing overall, unmatched pair, unsupported directory.  
-`scripts/test.sh` stays offline (no live G2 / Capterra / TikTok / Reddit / Amazon). After PR 1 it also runs `tsc --noEmit` and `node:test`. Live adapters are a follow-up after fixtures are on `main`.
+`scripts/test.sh` stays offline (no live G2 / Capterra / TikTok / Reddit / Amazon). After PR 1 it also runs `tsc --noEmit` and `node:test`. Live adapters exist but stay env-gated: default and CI use fixtures (`SAASREVIEWS_FIXTURE_ONLY=1`). Set `SAASREVIEWS_LIVE_DIRECTORIES=1` only on a machine that may fetch public G2/Capterra HTML.
 
 ---
 
@@ -75,5 +75,10 @@ Each PR is independently mergeable. Dependencies are hard.
 ### PR 5: MCP
 - **Tools:** get_saas, list_reviews, compare_saas
 - **Dependencies:** PR 4
+
+### PR 6: Live G2 + Capterra adapters (env-gated)
+- **Files:** `src/adapters/live.ts`, `src/adapters/http.ts`, `src/adapters/parse.ts`, `src/config.ts`, recorded HTML under `tests/fixtures/html/`, `tests/live-adapters.test.ts`
+- **Dependencies:** PR 5
+- **Acceptance:** default `createAppAdapters()` stays fixtures. `SAASREVIEWS_LIVE_DIRECTORIES=1` swaps in live adapters. Failures map to SPEC (`product_not_found`, `upstream_blocked`). Missing overall stays `null`. Unmatched compare stays unmatched. `scripts/test.sh` remains offline. No TrustRadius. No badge hosting. No Dockerfile.
 
 No badge image hosting. No TrustRadius files. Control-plane `/v1/me` and `/v1/usage` ride with keys in PR 1; billing $19 is after M3, not in this DAG.

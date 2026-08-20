@@ -87,11 +87,52 @@ if [[ -f src/core/product.ts ]]; then
   fi
 fi
 
-echo "== no live G2 / Capterra HTTP in core or adapters =="
-if [[ -d src/adapters ]] || [[ -d src/core ]]; then
-  if grep -RInE --include='*.ts' '(^|[^[:alnum:]_])(fetch|axios|got)\s*\(' src/adapters src/core >/dev/null; then
-    fail "live HTTP client call in adapters/core (fixture adapter only)"
+echo "== live HTTP stays isolated; default adapters remain fixtures =="
+if [[ -d src/core ]]; then
+  if grep -RInE --include='*.ts' '(^|[^[:alnum:]_])(fetch|axios|got)\s*\(' src/core >/dev/null; then
+    fail "live HTTP client call in src/core (core must stay offline)"
   fi
+fi
+if [[ -d src/adapters ]]; then
+  if grep -RInE --include='*.ts' '(^|[^[:alnum:]_])(axios|got)\s*\(' src/adapters >/dev/null; then
+    fail "adapters must not import axios/got"
+  fi
+  # fetch() is allowed only in the env-gated live HTTP helper.
+  if grep -RInE --include='*.ts' --exclude='http.ts' '(^|[^[:alnum:]_])fetch\s*\(' src/adapters >/dev/null; then
+    fail "fetch() outside src/adapters/http.ts (live client must stay isolated)"
+  fi
+fi
+[[ -f src/adapters/live.ts ]] || fail "missing src/adapters/live.ts"
+[[ -f src/adapters/http.ts ]] || fail "missing src/adapters/http.ts"
+[[ -f src/adapters/parse.ts ]] || fail "missing src/adapters/parse.ts"
+grep -q 'SAASREVIEWS_LIVE_DIRECTORIES' src/config.ts \
+  || fail "src/config.ts must env-gate live directories"
+grep -q 'SAASREVIEWS_FIXTURE_ONLY' src/config.ts \
+  || fail "src/config.ts must honor SAASREVIEWS_FIXTURE_ONLY"
+grep -q 'parseAdapterMode' src/adapters/index.ts \
+  || fail "createAppAdapters must consult parseAdapterMode"
+if grep -n 'createG2LiveAdapter()' src/adapters/index.ts >/dev/null && \
+   ! grep -q 'parseAdapterMode' src/adapters/index.ts; then
+  fail "live adapters wired without an env gate"
+fi
+if grep -R --include='*.ts' -E 'trustradius' src/adapters >/dev/null; then
+  fail "TrustRadius adapter files are out of v1"
+fi
+if [[ -f Dockerfile ]] || [[ -f docker-compose.yml ]]; then
+  fail "Do not start Dockerfile in this PR"
+fi
+
+echo "== recorded HTML fixtures for live parsers (offline) =="
+[[ -d tests/fixtures/html ]] || fail "missing tests/fixtures/html"
+[[ -f tests/fixtures/html/g2-notion.html ]] || fail "missing G2 HTML fixture"
+[[ -f tests/fixtures/html/capterra-notion.html ]] || fail "missing Capterra HTML fixture"
+[[ -f tests/fixtures/html/g2-ghostwriter.html ]] || fail "missing missing-score G2 HTML fixture"
+[[ -f tests/live-adapters.test.ts ]] || fail "missing tests/live-adapters.test.ts"
+if grep -RIn --include='*.ts' 'createDirectoryFetch(' tests >/dev/null; then
+  fail "unit tests must inject a recorded fetch, not createDirectoryFetch()"
+fi
+if grep -RInE --include='*.ts' 'SAASREVIEWS_LIVE_DIRECTORIES[[:space:]]*=[[:space:]]*1' tests >/dev/null; then
+  fail "unit tests must not enable live directories against the public web"
 fi
 
 echo "== compare + search + categories (PR 4) =="
@@ -149,8 +190,9 @@ if [[ -f package.json ]]; then
 
   echo "== unit tests =="
   # Quoted so bash 3.2 does not eat **; Node 22's test runner expands the glob.
-  # Fixture adapter only — never hit live G2 or Capterra.
+  # Offline: fixture adapters + recorded HTML. Never hit live G2 or Capterra.
   export SAASREVIEWS_FIXTURE_ONLY=1
+  unset SAASREVIEWS_LIVE_DIRECTORIES || true
   test_log="$(mktemp)"
   trap 'rm -f "$test_log"' EXIT
   set +e
@@ -160,6 +202,9 @@ if [[ -f package.json ]]; then
   [[ $test_status -eq 0 ]] || fail "unit tests failed"
   grep -Eq 'tests[[:space:]]+[1-9][0-9]*' "$test_log" \
     || fail "test runner reported 0 tests"
+  if grep -E 'g2.com|capterra.com' "$test_log" | grep -Ei 'ECONN|ENOTFOUND|fetch failed|socket hang up' >/dev/null; then
+    fail "unit tests appear to have opened a live directory socket"
+  fi
 fi
 
 echo "OK: buildable and testable"
