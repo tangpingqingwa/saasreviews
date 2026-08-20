@@ -9,7 +9,23 @@ export type ParsedDirectoryUrl =
     };
 
 const G2_HOSTS = new Set(["g2.com", "www.g2.com"]);
-const CAPTERRA_HOSTS = new Set(["capterra.com", "www.capterra.com"]);
+
+/** Public Capterra locales that sometimes serve product HTML when .com is walled. */
+export const CAPTERRA_PUBLIC_HOSTS = [
+  "www.capterra.com",
+  "www.capterra.ca",
+  "www.capterra.com.au",
+  "www.capterra.in",
+  "www.capterra.co.uk",
+  "www.capterra.ie",
+] as const;
+
+const CAPTERRA_HOSTS = new Set(
+  CAPTERRA_PUBLIC_HOSTS.flatMap((host) => {
+    const bare = host.replace(/^www\./, "");
+    return [host, bare];
+  }),
+);
 
 const KNOWN_UNSUPPORTED_HOSTS = new Set([
   "trustradius.com",
@@ -104,6 +120,71 @@ export function canonicalCapterraUrl(slug: string): string {
   return `https://www.capterra.com/p/${slug}/`;
 }
 
+export function g2ReviewsRssUrl(slug: string, page = 1): string {
+  const base = `https://www.g2.com/products/${encodeURIComponent(slug)}/reviews.rss`;
+  return page <= 1 ? base : `${base}?page=${page}`;
+}
+
+/**
+ * Candidate public Capterra product URLs for a slug.
+ * `.com /p/{slug}` first (SPEC canonical). Regional `/software/{id}/{slug}`
+ * pages are the same Capterra product when `.com` is a bot wall.
+ */
+export function capterraPublicProductUrls(
+  slug: string,
+  requestedUrl?: string,
+): string[] {
+  const urls: string[] = [];
+  const push = (url: string) => {
+    if (!urls.includes(url)) {
+      urls.push(url);
+    }
+  };
+  if (requestedUrl !== undefined && requestedUrl !== "") {
+    push(requestedUrl);
+  }
+  push(canonicalCapterraUrl(slug));
+  const numericId =
+    numericIdFromCapterraUrl(requestedUrl) ?? publicCapterraSoftwareId(slug);
+  if (numericId !== null) {
+    push(`https://www.capterra.com/p/${numericId}/${encodeURIComponent(slug)}/`);
+    for (const host of CAPTERRA_PUBLIC_HOSTS) {
+      if (host === "www.capterra.com") {
+        continue;
+      }
+      push(`https://${host}/software/${numericId}/${encodeURIComponent(slug)}`);
+    }
+  }
+  return urls;
+}
+
+/**
+ * Regional Capterra `/software/{id}/{slug}` ids. Used only to build public
+ * fallback URLs. Scores still come from the fetched page.
+ */
+const CAPTERRA_PUBLIC_SOFTWARE_IDS: Record<string, string> = {
+  notion: "186596",
+  slack: "135003",
+  jira: "19319",
+};
+
+export function publicCapterraSoftwareId(slug: string): string | null {
+  return CAPTERRA_PUBLIC_SOFTWARE_IDS[slug.toLowerCase()] ?? null;
+}
+
+export function numericIdFromCapterraUrl(raw: string | undefined): string | null {
+  if (raw === undefined || raw === "") {
+    return null;
+  }
+  try {
+    const parsed = new URL(hasScheme(raw) ? raw : `https://${raw}`);
+    const numbered = /^\/(?:p|software)\/(\d+)\/[^/]+/i.exec(parsed.pathname);
+    return numbered?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function g2SlugFromPath(pathname: string): string | null {
   const match = /^\/products\/([^/]+)(?:\/(?:reviews|pricing|features)?)?\/?$/.exec(
     pathname,
@@ -116,11 +197,13 @@ export function g2SlugFromPath(pathname: string): string | null {
  * Numeric software ids are dropped so fixtures key on the slug.
  */
 export function capterraSlugFromPath(pathname: string): string | null {
-  const numbered = /^\/p\/\d+\/([^/]+)(?:\/(?:reviews)?)?\/?$/.exec(pathname);
+  const numbered = /^\/(?:p|software)\/\d+\/([^/]+)(?:\/(?:reviews)?)?\/?$/.exec(
+    pathname,
+  );
   if (numbered) {
     return decodeSlug(numbered[1]);
   }
-  const slugged = /^\/p\/([^/]+)(?:\/(?:reviews)?)?\/?$/.exec(pathname);
+  const slugged = /^\/(?:p|software)\/([^/]+)(?:\/(?:reviews)?)?\/?$/.exec(pathname);
   if (slugged) {
     const first = slugged[1];
     if (first !== undefined && /^\d+$/.test(first)) {

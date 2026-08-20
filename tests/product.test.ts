@@ -13,7 +13,11 @@ import {
 import { buildApp } from "../src/app.js";
 import { getCredits } from "../src/billing/credits.js";
 import { createKey } from "../src/billing/keys.js";
-import { parseProductUrl } from "../src/core/url.js";
+import {
+  capterraPublicProductUrls,
+  parseProductUrl,
+  publicCapterraSoftwareId,
+} from "../src/core/url.js";
 import { openDatabase } from "../src/db.js";
 import {
   productCardSchema,
@@ -101,6 +105,8 @@ test("parseProductUrl accepts Capterra /p/{id}/{slug} and /p/{slug}", () => {
     { url: "https://capterra.com/p/184621/Notion", slug: "notion" },
     { url: "www.capterra.com/p/184621/notion/reviews", slug: "notion" },
     { url: "https://www.capterra.com/p/obsidian", slug: "obsidian" },
+    { url: "https://www.capterra.ca/software/186596/notion", slug: "notion" },
+    { url: "https://www.capterra.com.au/software/186596/Notion", slug: "notion" },
   ];
   for (const { url, slug } of cases) {
     const parsed = parseProductUrl(url);
@@ -110,6 +116,15 @@ test("parseProductUrl accepts Capterra /p/{id}/{slug} and /p/{slug}", () => {
       assert.equal(parsed.directorySlug, slug);
     }
   }
+});
+
+test("capterra public fallbacks keep the .com card URL and do not invent an id", () => {
+  assert.equal(publicCapterraSoftwareId("notion"), "186596");
+  assert.equal(publicCapterraSoftwareId("unknown-saas"), null);
+  const urls = capterraPublicProductUrls("notion", "https://www.capterra.com/p/186596/Notion/");
+  assert.equal(urls[0], "https://www.capterra.com/p/186596/Notion/");
+  assert.ok(urls.includes("https://www.capterra.com/p/notion/"));
+  assert.ok(urls.includes("https://www.capterra.ca/software/186596/notion"));
 });
 
 test("parseProductUrl rejects unknown directories before fetch", () => {

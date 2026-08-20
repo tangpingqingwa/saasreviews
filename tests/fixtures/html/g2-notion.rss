@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Notion Reviews</title>
+    <description>Reviews of Notion on G2 Crowd.</description>
+    <link>https://www.g2.com/products/notion/reviews</link>
+    <item>
+      <title><![CDATA[Public workspace that replaced our wiki]]></title>
+      <description><![CDATA[
+        <p>Review from Verified User in Information Technology and Services </p>
+        <p>4.5 Stars</p>
+        <ul>
+          <li>role: Head of Ops</li>
+          <li>size: 51-200 employees</li>
+        </ul>
+        <p>What do you like best about Notion?<br/>Search is good enough and pages stay public.</p>
+      ]]></description>
+      <pubDate>Wed, 19 Aug 2026 13:54:00 -0500</pubDate>
+      <link>https://www.g2.com/products/notion/reviews/notion-review-13331342</link>
+      <guid>https://www.g2.com/products/notion/reviews/notion-review-13331342</guid>
+    </item>
+    <item>
+      <title><![CDATA[Flexible enough for notes and tasks]]></title>
+      <description><![CDATA[
+        <p>Review from G2 User</p>
+        <p>5.0 Stars</p>
+        <p>What do you like best about Notion?<br/>One workspace for docs and tasks.</p>
+      ]]></description>
+      <pubDate>Sat, 15 Aug 2026 09:47:56 -0500</pubDate>
+      <guid>https://www.g2.com/products/notion/reviews/notion-review-13276560</guid>
+    </item>
+  </channel>
+</rss>

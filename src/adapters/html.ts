@@ -35,8 +35,12 @@ export function firstMatch(html: string, pattern: RegExp): string | null {
   if (value === undefined) {
     return null;
   }
-  const trimmed = decodeHtmlEntities(value).trim();
+  const trimmed = decodeHtmlEntities(unwrapCdata(value)).trim();
   return trimmed === "" ? null : trimmed;
+}
+
+export function unwrapCdata(value: string): string {
+  return value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/gi, "$1");
 }
 
 export function parseJsonLdBlocks(html: string): unknown[] {

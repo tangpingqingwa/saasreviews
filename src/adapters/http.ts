@@ -3,7 +3,7 @@ import type { AdapterFailureCode } from "./types.js";
 export const DEFAULT_USER_AGENT =
   "SaaSReviews/0.1 (+https://github.com/tangpingqingwa/saasreviews; public reviews only)";
 
-export const DEFAULT_TIMEOUT_MS = 8_000;
+export const DEFAULT_TIMEOUT_MS = 12_000;
 
 export type DirectoryHttpResponse = {
   status: number;
@@ -34,7 +34,8 @@ export function createDirectoryFetch(
         redirect: "follow",
         signal: controller.signal,
         headers: {
-          accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+          accept:
+            "text/html,application/xhtml+xml,application/rss+xml;q=0.9,*/*;q=0.8",
           "accept-language": "en-US,en;q=0.8",
           "user-agent": userAgent,
         },

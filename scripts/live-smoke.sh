@@ -33,7 +33,7 @@ command -v curl >/dev/null || fail "curl is required"
 command -v node >/dev/null || fail "node is required"
 
 G2_URL="${SAASREVIEWS_LIVE_SMOKE_G2_URL:-https://www.g2.com/products/notion/reviews}"
-CAPTERRA_URL="${SAASREVIEWS_LIVE_SMOKE_CAPTERRA_URL:-https://www.capterra.com/p/161365/Notion/}"
+CAPTERRA_URL="${SAASREVIEWS_LIVE_SMOKE_CAPTERRA_URL:-https://www.capterra.com/p/186596/Notion/}"
 COMPARE_A="${SAASREVIEWS_LIVE_SMOKE_COMPARE_A:-g2:notion}"
 COMPARE_B="${SAASREVIEWS_LIVE_SMOKE_COMPARE_B:-capterra:notion}"
 KEY="${SAASREVIEWS_LIVE_SMOKE_KEY:-sr_test_live_smoke}"
@@ -142,7 +142,7 @@ request() {
       -H "Accept: application/json" \
       -o "$out" -w "%{http_code}" \
       --connect-timeout 10 \
-      --max-time 45 \
+      --max-time 90 \
       "$url"
   )" || fail "curl failed for ${method} ${path}"
   printf "%s" "$http"
@@ -261,6 +261,7 @@ capterra_http="$(request "$workdir/capterra.json" GET "/v1/products/by-url?url=$
 compare_http="$(request "$workdir/compare.json" GET "/v1/compare?a=$(encode_query "$COMPARE_A")&b=$(encode_query "$COMPARE_B")")"
 
 verdict="PASS"
+blocked_all=0
 
 accept_blocked() {
   local file="$1" http="$2"
@@ -303,6 +304,7 @@ if [[ "$g2_http" == "200" ]]; then
   fi
 elif accept_blocked "$workdir/g2.json" "$g2_http"; then
   g2_status="PASS-ERROR"
+  blocked_all=$((blocked_all + 1))
   note "g2-product: PASS-ERROR — HTTP ${g2_http} $(json_print "$workdir/g2.json" error.code), 0 credits (real G2 page blocked or unparseable; stars not invented)"
 else
   note "g2-product: FAIL — unexpected HTTP ${g2_http} body=$(head -c 240 "$workdir/g2.json" 2>/dev/null || true)"
@@ -325,6 +327,7 @@ if [[ "$reviews_http" == "200" ]]; then
   fi
 elif accept_blocked "$workdir/reviews.json" "$reviews_http"; then
   reviews_status="PASS-ERROR"
+  blocked_all=$((blocked_all + 1))
   note "g2-reviews: PASS-ERROR — HTTP ${reviews_http} $(json_print "$workdir/reviews.json" error.code), 0 credits (no review invented)"
 else
   note "g2-reviews: FAIL — unexpected HTTP ${reviews_http}"
@@ -359,6 +362,7 @@ if [[ "$capterra_http" == "200" ]]; then
   fi
 elif accept_blocked "$workdir/capterra.json" "$capterra_http"; then
   capterra_status="PASS-ERROR"
+  blocked_all=$((blocked_all + 1))
   note "capterra-product: PASS-ERROR — HTTP ${capterra_http} $(json_print "$workdir/capterra.json" error.code), 0 credits (real Capterra page blocked or unparseable; stars not invented)"
 else
   note "capterra-product: FAIL — unexpected HTTP ${capterra_http}"
@@ -398,6 +402,7 @@ if [[ "$compare_http" == "200" ]]; then
   fi
 elif accept_blocked "$workdir/compare.json" "$compare_http"; then
   compare_status="PASS-ERROR"
+  blocked_all=$((blocked_all + 1))
   note "compare: PASS-ERROR — HTTP ${compare_http} $(json_print "$workdir/compare.json" error.code), 0 credits (directory blocked; no fake merge or stars)"
 else
   note "compare: FAIL — unexpected HTTP ${compare_http}"
@@ -417,6 +422,21 @@ if [[ "$verdict" != "PASS" ]]; then
   echo "---- compare body ----" >&2
   cat "$workdir/compare.json" >&2 || true
   fail "live-smoke verdict=${verdict}"
+fi
+
+# G2 product + reviews must be live SPEC data. A Capterra-only bot wall is a
+# documented SPEC error (not invented stars) when G2 already PASSed.
+if [[ "$g2_status" != "PASS" || "$reviews_status" != "PASS" ]]; then
+  fail "live-smoke needs live G2 product + reviews PASS (not only PASS-ERROR bot wall)"
+fi
+if [[ "$capterra_status" != "PASS" && "$capterra_status" != "PASS-ERROR" ]]; then
+  fail "live-smoke Capterra product was neither PASS nor documented SPEC error"
+fi
+if [[ "$compare_status" != "PASS" && "$compare_status" != "PASS-ERROR" ]]; then
+  fail "live-smoke compare was neither PASS nor documented SPEC error"
+fi
+if [[ "$capterra_status" == "PASS-ERROR" ]]; then
+  note "capterra documented: public .com and regional HTML still Cloudflare-walled from this host; overall not invented"
 fi
 
 echo "OK: live flags on; every required flow walked against real G2/Capterra public pages"
