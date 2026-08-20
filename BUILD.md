@@ -81,4 +81,9 @@ Each PR is independently mergeable. Dependencies are hard.
 - **Dependencies:** PR 5
 - **Acceptance:** default `createAppAdapters()` stays fixtures. `SAASREVIEWS_LIVE_DIRECTORIES=1` swaps in live adapters. Failures map to SPEC (`product_not_found`, `upstream_blocked`). Missing overall stays `null`. Unmatched compare stays unmatched. `scripts/test.sh` remains offline. No TrustRadius. No badge hosting. No Dockerfile.
 
+### PR 7: Dockerfile + one-VPS runbook
+- **Files:** `Dockerfile`, `.env.example`, `deploy/runbook.md`
+- **Dependencies:** PR 6
+- **Acceptance:** Node 22, non-root, listen on `$PORT`; live directories stay off until the operator sets `SAASREVIEWS_LIVE_DIRECTORIES`; CI stays offline
+
 No badge image hosting. No TrustRadius files. Control-plane `/v1/me` and `/v1/usage` ride with keys in PR 1; billing $19 is after M3, not in this DAG.

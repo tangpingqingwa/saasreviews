@@ -78,3 +78,7 @@ Every competitive slide for our other nine products pulls quotes through SaaSRev
 ## Risk
 
 Directories dislike scrapers and have lawyers. Stay on public review text. No login walls. Branding: independent index of public reviews, not “G2 but cheaper” in a way that implies affiliation.
+
+## One-box deploy
+
+`Dockerfile` + [`.env.example`](./.env.example). Operator steps: [deploy/runbook.md](./deploy/runbook.md). Live G2/Capterra stays off until `SAASREVIEWS_LIVE_DIRECTORIES=1`.

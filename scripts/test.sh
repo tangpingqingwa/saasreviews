@@ -118,9 +118,6 @@ fi
 if grep -R --include='*.ts' -E 'trustradius' src/adapters >/dev/null; then
   fail "TrustRadius adapter files are out of v1"
 fi
-if [[ -f Dockerfile ]] || [[ -f docker-compose.yml ]]; then
-  fail "Do not start Dockerfile in this PR"
-fi
 
 echo "== recorded HTML fixtures for live parsers (offline) =="
 [[ -d tests/fixtures/html ]] || fail "missing tests/fixtures/html"
@@ -171,6 +168,37 @@ if grep -RInE --include='*.ts' '(^|[^[:alnum:]_])(fetch|axios|got)\s*\(' src/mcp
 fi
 if grep -R --include='*.ts' -E 'https?://(www\.)?(g2|capterra)\.com' src/mcp >/dev/null; then
   fail "src/mcp must not hardcode live G2/Capterra hosts"
+fi
+
+echo "== deploy artifacts (Dockerfile + runbook) =="
+[[ -f Dockerfile ]] || fail "missing Dockerfile"
+[[ -f .env.example ]] || fail "missing .env.example"
+[[ -f deploy/runbook.md ]] || fail "missing deploy/runbook.md"
+grep -q 'node:22' Dockerfile || fail "Dockerfile must use Node 22"
+grep -qE '^USER[[:space:]]+node$' Dockerfile || fail "Dockerfile must run as non-root USER node"
+grep -q 'PORT' Dockerfile || fail "Dockerfile must honor PORT"
+grep -q 'src/server.ts' Dockerfile || fail "Dockerfile must start src/server.ts"
+if grep -E 'SAASREVIEWS_LIVE_DIRECTORIES[[:space:]]*=[[:space:]]*(1|true|yes|on)' Dockerfile >/dev/null; then
+  fail "Dockerfile must not enable live directories"
+fi
+if [[ -f docker-compose.yml ]]; then
+  fail "one-box deploy is Dockerfile only; do not add docker-compose"
+fi
+grep -q 'SAASREVIEWS_LIVE_DIRECTORIES' .env.example || fail ".env.example missing SAASREVIEWS_LIVE_DIRECTORIES"
+grep -q 'SAASREVIEWS_DATABASE' .env.example || fail ".env.example missing SAASREVIEWS_DATABASE"
+grep -q 'SAASREVIEWS_BOOTSTRAP_KEY' .env.example || fail ".env.example missing SAASREVIEWS_BOOTSTRAP_KEY"
+if grep -E '^[[:space:]]*SAASREVIEWS_LIVE_DIRECTORIES=1[[:space:]]*$' .env.example >/dev/null; then
+  fail ".env.example must not default live directories on"
+fi
+if grep -E '^[[:space:]]*SAASREVIEWS_BOOTSTRAP_KEY=sr_(live|test)_' .env.example >/dev/null; then
+  fail ".env.example must not ship a real bootstrap key"
+fi
+grep -q '/healthz' deploy/runbook.md || fail "runbook missing /healthz"
+grep -q 'SAASREVIEWS_LIVE_DIRECTORIES' deploy/runbook.md || fail "runbook missing live directory enablement"
+grep -q 'docker build' deploy/runbook.md || fail "runbook missing docker build"
+grep -q 'docker run' deploy/runbook.md || fail "runbook missing docker run"
+if grep -RInE 'trustradius' Dockerfile deploy .env.example >/dev/null 2>&1; then
+  fail "deploy artifacts must not target TrustRadius"
 fi
 
 if [[ -f package.json ]]; then
